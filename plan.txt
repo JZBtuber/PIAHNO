@@ -1,4 +1,4 @@
-MIDI - Module: "mido" to read and write MIDI file, pygame to play the audio
+MIDI - Module: "mido" to read and write MIDI file, PyAudio to play the audio
 https://dev.to/dm8ry/automating-midi-generation-with-python-a-comprehensive-guide-ckb #Create a MIDI file from noting
 http://twilio.com/en-us/blog/developers/tutorials/building-blocks/working-with-midi-data-in-python-using-mido #Read and write MIDI files
 https://stackoverflow.com/questions/6030087/play-midi-files-in-python #Playing a MIDI file with the module "pygame"
