@@ -2,3 +2,7 @@ MIDI - Module: "mido" library
 https://dev.to/dm8ry/automating-midi-generation-with-python-a-comprehensive-guide-ckb #Create a MIDI file from noting
 http://twilio.com/en-us/blog/developers/tutorials/building-blocks/working-with-midi-data-in-python-using-mido #Read and write MIDI files
 https://stackoverflow.com/questions/6030087/play-midi-files-in-python #Playing a MIDI file with the module "pygame"
+
+KeyFrame - Module: OpenCV for live video feed, Numpy for frame by frame management and Mediapipe for the hand algorithm
+https://colab.research.google.com/github/googlesamples/mediapipe/blob/main/examples/hand_landmarker/python/hand_landmarker.ipynb?hl=fr#scrollTo=s3E6NFV-00Qt
+https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker?hl=fr
