@@ -9,6 +9,7 @@ https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker?hl=fr
 
 Audio - Module: Pyaudio
 https://pypi.org/project/PyAudio/
+https://medium.com/geekculture/real-time-audio-wave-visualization-in-python-b1c5b96e2d39
 
 GUI - Module: PySimpleGUI for the GUI module
 https://www.pysimplegui.com/
