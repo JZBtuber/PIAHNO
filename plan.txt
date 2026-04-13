@@ -13,3 +13,4 @@ https://medium.com/geekculture/real-time-audio-wave-visualization-in-python-b1c5
 
 GUI - Module: PyQT6 for the GUI module
 https://www.pythonguis.com/tutorials/pyqt6-creating-your-first-window/
+https://medium.com/@ilias.info.tel/display-opencv-camera-on-a-pyqt-app-4465398546f7 #OpenCV integration
