@@ -1,0 +1,2 @@
+MIDI - Module: "mido" library
+https://dev.to/dm8ry/automating-midi-generation-with-python-a-comprehensive-guide-ckb
