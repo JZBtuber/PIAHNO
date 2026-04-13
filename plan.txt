@@ -1,7 +1,7 @@
 MIDI - Module: "mido" to read and write MIDI file, PyAudio to play the audio
 https://dev.to/dm8ry/automating-midi-generation-with-python-a-comprehensive-guide-ckb #Create a MIDI file from noting
 http://twilio.com/en-us/blog/developers/tutorials/building-blocks/working-with-midi-data-in-python-using-mido #Read and write MIDI files
-https://stackoverflow.com/questions/6030087/play-midi-files-in-python #Playing a MIDI file with the module "pygame"
+https://stackoverflow.com/questions/6030087/play-midi-files-in-python #Playing a MIDI file with the module "Pyaudio"
 
 KeyFrame - Module: OpenCV for live video feed, Numpy for frame by frame management and Mediapipe for the hand algorithm
 https://colab.research.google.com/github/googlesamples/mediapipe/blob/main/examples/hand_landmarker/python/hand_landmarker.ipynb?hl=fr#scrollTo=s3E6NFV-00Qt
@@ -11,5 +11,5 @@ Audio - Module: Pyaudio
 https://pypi.org/project/PyAudio/
 https://medium.com/geekculture/real-time-audio-wave-visualization-in-python-b1c5b96e2d39
 
-GUI - Module: PySimpleGUI for the GUI module
-https://www.pysimplegui.com/
+GUI - Module: PyQT6 for the GUI module
+https://www.pythonguis.com/tutorials/pyqt6-creating-your-first-window/
