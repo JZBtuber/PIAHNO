@@ -1,9 +1,15 @@
 from PyQt6.QtWidgets import *
-from PyQt6.QtGui import QAction, QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QIcon, QPixmap
+from PyQt6.QtCore import Qt, QThread
 from src.gui.layout_colorwidget import Color
+from src.video.video import VideoFeed
+import math
+
 
 class MainWindow(QMainWindow):
+
+    windows = []
+
     def __init__(self):
         super().__init__()
 
@@ -19,6 +25,7 @@ class MainWindow(QMainWindow):
     def addBaseWidget(self):
         self.fond = QWidget()
         self.fondLayout = QGridLayout()
+        self.fondLayout.setSpacing(10)
         self.fond.setLayout(self.fondLayout)
 
         self.addTopMenu()
@@ -33,10 +40,25 @@ class MainWindow(QMainWindow):
         self.toolbar = QToolBar()
         self.addToolBar(self.toolbar)
 
-        self.quickAccess = [QAction("Add a window", self), QAction("Save project", self)]
+        self.quickAccess = [QAction("Add a window", self),
+                            QAction("Save project", self),
+                            QAction("Start", self),
+                            QAction("Pause/Resume", self),
+                            QAction("Stop",self)]
+        
         self.quickAccess[0].setStatusTip("Add an observation window")
         self.quickAccess[1].setStatusTip("Save the current project setup")
+        self.quickAccess[2].setStatusTip("Start all video/audio")
+        self.quickAccess[3].setStatusTip("Pause and resume all video/audio")
+        self.quickAccess[4].setStatusTip("Stop all video/audio")
+
+
         self.quickAccess[0].triggered.connect(self.addWindow)
+
+        self.quickAccess[2].triggered.connect(self.startALL)
+        self.quickAccess[3].triggered.connect(self.pauseALL)
+        self.quickAccess[4].triggered.connect(self.stopALL)
+
         self.toolbar.addActions(self.quickAccess)
         
 
@@ -64,20 +86,32 @@ class MainWindow(QMainWindow):
             self.editMenu.addSeparator
             self.editMenu.addAction(o)
 
-    def addWindow(self):
-        
-
-        match self.windowNumber:
-
+    def addWindow(self, widgetNumber = 0):
+        match widgetNumber:
             case 0:
-                self.fondLayout.addWidget(Color("Red"), 0, 0)
-            case 1:
-                self.fondLayout.addWidget(Color("Blue"), 0, 1)
-            case 2:
-                self.fondLayout.addWidget(Color("Green"), 1, 0)
-            case 3:
-                self.fondLayout.addWidget(Color("Orange"), 1, 1)
+                video = VideoFeed()
+                self.windows.append(video)
+                self.fondLayout.addWidget(video,
+                                         math.floor((self.windowNumber / 4)),
+                                        (self.windowNumber % 4))
         self.windowNumber += 1
+
+    def startALL(self):
+        for w in self.windows:
+            if hasattr(w, "start"):
+                w.start()
+            
+    def pauseALL(self):
+        for w in self.windows:
+            if hasattr(w, "pause"):
+                w.pause()
+    
+    def stopALL(self):
+        for w in self.windows:
+            if hasattr(w, "stop"):
+                w.stop()
+        
+        
         
 
 
@@ -113,10 +147,7 @@ class topMenu(QToolBar):
 
 
 
-class VideoFeed(QLabel):
-    def __init__(self):
-        super().__init__()
-        self.setText("Hello, world!")
+
 
         
     

@@ -1,5 +1,4 @@
 from src.gui.gui import Application
-from src.gui.MainWindow import VideoFeed
 
 #----------------------------------------------------------------#
 # This code was writen by Justin Boileau
