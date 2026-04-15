@@ -13,24 +13,28 @@ class VideoWorker(QObject):
 
     def __init__(self, path, isCamera = True, cameraNumber = 0):
         super().__init__()
-        self.path = path
-        self.isCamera = isCamera
-        self.cameraNumber = cameraNumber
-        self.useAlgorithm = False
+
+        #Setting the worker's defalt settings
+        self.path = path                    #Path to the video to load
+        self.isCamera = isCamera            #Using a camera/loading a video
+        self.cameraNumber = cameraNumber    #Default camera number for multile camera windows 
+        self.useAlgorithm = False           #Use the MediaPipe algorithm
+        self.running = False                #Is running
+        self.paused = False                 #Is paused
+
+        self.setMediapipeSettings()
 
 
+    def setMediapipeSettings(self): #Setting the Mediapipe default settings
         base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
         options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=4)
         self.detector = vision.HandLandmarker.create_from_options(options)
 
-        self.running = False
-        self.paused = False
-
 
     def run(self):
-        capture = cv2.VideoCapture(self.cameraNumber if self.isCamera else self.path)
-
         self.running = True
+
+        capture = cv2.VideoCapture(self.cameraNumber if self.isCamera else self.path)
 
         while self.running and capture.isOpened():
 
@@ -182,6 +186,7 @@ class VideoFeed(QWidget):
         controlsLayout.addWidget(self.startButton)
         controlsLayout.addWidget(self.pauseButton)
         controlsLayout.addWidget(self.stopButton)
+        controlsLayout.addStretch()
 
         layout.addLayout(controlsLayout)
 
@@ -205,7 +210,7 @@ class VideoFeed(QWidget):
         self.cameraControl.addStretch()
 
         self.Hands = QCheckBox("Use Mediapipe Algorithm")
-        self.OnlyHands = QCheckBox("Use ONLY the Mediapipe Algorithm")
+        self.OnlyHands = QCheckBox("Use ONLY the Algorithm")
 
         self.algorithm = QHBoxLayout()
 
@@ -216,7 +221,7 @@ class VideoFeed(QWidget):
         layout.addLayout(self.cameraControl)
         layout.addLayout(self.algorithm)
         layout.addWidget(self.pathInput)
-
+        layout.addStretch()
 
         self.Hands.stateChanged.connect(self.ChangeAlgorithm)
         self.Hands.stateChanged.connect(self.ChangeAlgorithm)
@@ -320,3 +325,15 @@ class VideoFeed(QWidget):
     def numpy_to_qimage(self, arr):
         h, w, ch = arr.shape
         return QImage(arr.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
+    
+    def resizeEvent(self, event):
+        if self.video.pixmap():
+            pixmap = self.video.pixmap()
+            scaled = pixmap.scaled(
+                self.video.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.video.setPixmap(scaled)
+
+        super().resizeEvent(event)

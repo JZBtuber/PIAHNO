@@ -87,14 +87,16 @@ class MainWindow(QMainWindow):
             self.editMenu.addAction(o)
 
     def addWindow(self, widgetNumber = 0):
-        match widgetNumber:
-            case 0:
-                video = VideoFeed()
-                self.windows.append(video)
-                self.fondLayout.addWidget(video,
+        if not self.windowNumber <8:
+            match widgetNumber:
+                case 0:
+                    video = VideoFeed()
+                    self.windows.append(video)
+                    self.fondLayout.addWidget(video,
                                          math.floor((self.windowNumber / 4)),
                                         (self.windowNumber % 4))
-        self.windowNumber += 1
+            self.windowNumber += 1
+            
 
     def startALL(self):
         for w in self.windows:
