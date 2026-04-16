@@ -5,10 +5,16 @@ from src.gui.layout_colorwidget import Color
 from src.video.video import VideoFeed
 import math
 
+class WidgetData():
+    def __init__(self, widget: QWidget = None, ID: int = 0):
+        self.widget = widget
+        self.ID = ID
+
+    
+    def setID(self, ID: int):
+        self.ID = ID
 
 class MainWindow(QMainWindow):
-
-    windows = []
 
     def __init__(self):
         super().__init__()
@@ -20,7 +26,7 @@ class MainWindow(QMainWindow):
         self.showMaximized()
         self.addBaseWidget()
         self.windowNumber = 0
-
+        self.windows = [[WidgetData() for _ in range(4)] for _ in range(2)]
 
     def addBaseWidget(self):
         self.fond = QWidget()
@@ -39,6 +45,7 @@ class MainWindow(QMainWindow):
 
         self.toolbar = QToolBar()
         self.addToolBar(self.toolbar)
+        self.dialog = WindowChoice(self)
 
         self.quickAccess = [QAction("Add a window", self),
                             QAction("Save project", self),
@@ -53,7 +60,7 @@ class MainWindow(QMainWindow):
         self.quickAccess[4].setStatusTip("Stop all video/audio")
 
 
-        self.quickAccess[0].triggered.connect(self.addWindow)
+        self.quickAccess[0].triggered.connect(self.dialog.exec)
 
         self.quickAccess[2].triggered.connect(self.startALL)
         self.quickAccess[3].triggered.connect(self.pauseALL)
@@ -86,16 +93,20 @@ class MainWindow(QMainWindow):
             self.editMenu.addSeparator
             self.editMenu.addAction(o)
 
-    def addWindow(self, widgetNumber = 0):
-        if self.windowNumber <8:
-            match widgetNumber:
-                case 0:
-                    video = VideoFeed()
-                    self.windows.append(video)
-                    self.fondLayout.addWidget(video,
-                                         math.floor((self.windowNumber / 4)),
-                                        (self.windowNumber % 4))
-            self.windowNumber += 1
+
+    def addWindow(self, widgetClass):
+        done = False
+        for i, iData in enumerate(self.windows):
+            for j, jData in enumerate(iData):
+                if jData.widget is None:
+                    widget = widgetClass(int((i * 4 + j + 1))) if isinstance(widgetClass, type) else widgetClass
+                    jData.widget = widget
+                    jData.setID(int(i * 4 + j + 1))
+                    self.fondLayout.addWidget(widget, int(i), int(j))
+                    done = True
+                if done: break
+            if done: break
+
             
 
     def startALL(self):
@@ -113,9 +124,6 @@ class MainWindow(QMainWindow):
             if hasattr(w, "stop"):
                 w.stop()
         
-        
-        
-
 
     def contextMenu(self):
         print("")
@@ -141,8 +149,22 @@ class topMenu(QToolBar):
         self.addActions(self.menuButtons)
 
 
+class WindowChoice(QDialog):
+    def __init__(self, MainWindow):
+        super().__init__()
+        self.mainWindow = MainWindow
+        vert = QVBoxLayout()
+        hor1 = QHBoxLayout()
+        addWindowButton = QPushButton("Add a window")
+        addWindowButton.clicked.connect(self.addWindow)
+        hor1.addWidget(addWindowButton)
+        vert.addLayout(hor1)
+        self.setLayout(vert)
+        
 
-
+    def addWindow(self, checked = False, widgetClass = VideoFeed):
+        self.mainWindow.addWindow(widgetClass)
+        self.close()
 
 
 

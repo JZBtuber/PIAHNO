@@ -136,10 +136,11 @@ class VideoWorker(QObject):
     
 
 class VideoFeed(QWidget):
-    def __init__(self, defaultPath = 0, cameraNumber = 0):
+    def __init__(self, ID: int, defaultPath = 0, cameraNumber = 0):
         super().__init__()
 
         #Set the default values of variables
+        self.ID = ID
         self.defaultPath = defaultPath
         self.cameraNumber = cameraNumber
         self.UseCamera = True
@@ -147,6 +148,8 @@ class VideoFeed(QWidget):
         self.OnlyAlgorithm = False #Not programmed yet, Should blackout everything but the handmarks
 
         #Creating the widgets
+        #ID counter
+        self.IDlabel = QLabel(f"{self.ID}")
         #Video feed
         self.video = QLabel()
         self.video.setMinimumSize(320, 240)
@@ -206,6 +209,7 @@ class VideoFeed(QWidget):
         #Main Layout of the widget
         layout = QVBoxLayout()
         self.setLayout(layout)
+        layout.addWidget(self.IDlabel)
         layout.addWidget(self.video, 1)
         layout.addLayout(controlsLayout, 0)
         layout.addLayout(self.cameraControl, 0)
