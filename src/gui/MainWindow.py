@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
             self.editMenu.addAction(o)
 
     def addWindow(self, widgetNumber = 0):
-        if not self.windowNumber <8:
+        if self.windowNumber <8:
             match widgetNumber:
                 case 0:
                     video = VideoFeed()
