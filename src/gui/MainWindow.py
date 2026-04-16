@@ -3,6 +3,7 @@ from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtCore import Qt, QThread
 from src.gui.layout_colorwidget import Color
 from src.video.video import VideoFeed
+from src.audio.midi import MidiFeed
 import math
 
 class WidgetData():
@@ -13,6 +14,7 @@ class WidgetData():
     
     def setID(self, ID: int):
         self.ID = ID
+
 
 class MainWindow(QMainWindow):
 
@@ -110,19 +112,22 @@ class MainWindow(QMainWindow):
             
 
     def startALL(self):
-        for w in self.windows:
-            if hasattr(w, "start"):
-                w.start()
+        for i in self.windows:
+            for j in i:
+                if not j.widget == None:
+                    j.widget.start()
             
     def pauseALL(self):
-        for w in self.windows:
-            if hasattr(w, "pause"):
-                w.pause()
+        for i in self.windows:
+            for j in i:
+                if not j.widget == None:
+                    j.widget.pause()
     
     def stopALL(self):
-        for w in self.windows:
-            if hasattr(w, "stop"):
-                w.stop()
+        for i in self.windows:
+            for j in i:
+                if not j.widget == None:
+                    j.widget.stop()
         
 
     def contextMenu(self):
@@ -155,15 +160,26 @@ class WindowChoice(QDialog):
         self.mainWindow = MainWindow
         vert = QVBoxLayout()
         hor1 = QHBoxLayout()
-        addWindowButton = QPushButton("Add a window")
-        addWindowButton.clicked.connect(self.addWindow)
-        hor1.addWidget(addWindowButton)
+        addWindowButtonVideo = QPushButton("Add a Video Feed")
+        addWindowButtonVideo.clicked.connect(self.setVideo)
+        addWindowButtonVideo.clicked.connect(self.addWindow)
+        addWindowButtonMidi = QPushButton("Add a Midi Feed")
+        addWindowButtonMidi.clicked.connect(self.setMidi)
+        addWindowButtonMidi.clicked.connect(self.addWindow)
+        hor1.addWidget(addWindowButtonVideo)
+        hor1.addWidget(addWindowButtonMidi)
         vert.addLayout(hor1)
         self.setLayout(vert)
-        
+        self.widget = None
 
-    def addWindow(self, checked = False, widgetClass = VideoFeed):
-        self.mainWindow.addWindow(widgetClass)
+    def setVideo(self):
+        self.widget = VideoFeed
+
+    def setMidi(self):
+        self.widget = MidiFeed
+
+    def addWindow(self, checked = False):
+        self.mainWindow.addWindow(self.widget)
         self.close()
 
 

@@ -149,7 +149,7 @@ class VideoFeed(QWidget):
 
         #Creating the widgets
         #ID counter
-        self.IDlabel = QLabel(f"{self.ID}")
+        self.IDlabel = QLabel(str(self.ID))
         #Video feed
         self.video = QLabel()
         self.video.setMinimumSize(320, 240)
