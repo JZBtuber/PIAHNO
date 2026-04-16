@@ -1,62 +1,183 @@
 from mido import MidiFile
 from PyQt6.QtWidgets import QCheckBox, QWidget, QHBoxLayout, QVBoxLayout, QListWidgetItem, QLabel, QListWidget, QPushButton, QLineEdit
-from PyQt6.QtCore import QObject, pyqtSignal, QThread
+from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QColor
+import time
+import math
+import numpy as np
+import pyaudio
+
+
 class MidiWorker(QObject):
     noteOn = pyqtSignal(int, int)
     noteOff = pyqtSignal(int)
-    finished =pyqtSignal()
+    finished = pyqtSignal()
 
-
-    def __init__(self, midiPath: str):
+    def __init__(self, midiPath: str, sample_rate: int = 44100, chunk: int = 512):
         super().__init__()
         self.midiPath = midiPath
+        self.sample_rate = sample_rate
+        self.chunk = chunk
+
         self.running = False
         self.paused = False
         self.muted = True
 
-        self.audioPlayer = None
+        self.p = None
+        self.stream = None
 
+        self.active_notes = {}   # note -> velocity
+        self._phase = {}         # note -> phase in radians
+
+    def midi_note_freq(self, note: int) -> float:
+        return 440.0 * (2.0 ** ((note - 69) / 12.0))
+
+    def make_chunk(self, frames: int) -> bytes:
+        if self.muted or not self.active_notes:
+            samples = np.zeros(frames, dtype=np.float32)
+        else:
+            t = np.arange(frames, dtype=np.float32) / self.sample_rate
+            samples = np.zeros(frames, dtype=np.float32)
+
+            for note, velocity in list(self.active_notes.items()):
+                freq = self.midi_note_freq(note)
+                phase = self._phase.get(note, 0.0)
+
+                # simple sine wave
+                wave = np.sin((2.0 * np.pi * freq * t) + phase)
+
+                # scale by velocity
+                amp = (velocity / 127.0) * 0.15
+                samples += wave * amp
+
+                # store phase continuity
+                phase_advance = 2.0 * np.pi * freq * frames / self.sample_rate
+                self._phase[note] = (phase + phase_advance) % (2.0 * np.pi)
+
+            # prevent clipping
+            samples = np.clip(samples, -1.0, 1.0)
+
+        # convert float32 mono PCM
+        return samples.astype(np.float32).tobytes()
+
+    def open_audio(self):
+        self.p = pyaudio.PyAudio()
+        self.stream = self.p.open(
+            format=pyaudio.paFloat32,
+            channels=1,
+            rate=self.sample_rate,
+            output=True,
+            frames_per_buffer=self.chunk
+        )
+
+    def close_audio(self):
+        if self.stream is not None:
+            try:
+                self.stream.stop_stream()
+            except Exception:
+                pass
+            try:
+                self.stream.close()
+            except Exception:
+                pass
+            self.stream = None
+
+        if self.p is not None:
+            try:
+                self.p.terminate()
+            except Exception:
+                pass
+            self.p = None
+
+    @pyqtSlot()
     def run(self):
         self.running = True
+        self.paused = False
+        self.active_notes.clear()
+        self._phase.clear()
+
         midi = MidiFile(self.midiPath, clip=True)
+        events = list(midi)  # raw messages, use msg.time yourself
 
-        for msg in midi.play():
-            if not self.running:
-                break
+        try:
+            self.open_audio()
 
-            while self.paused:
-                QThread.msleep(50)
-                continue
+            event_index = 0
+            next_event_time = events[0].time if events else None
+            song_time = 0.0
 
-            if msg.type == "note_on" and msg.velocity > 0:
-                self.noteOn.emit(msg.note, msg.velocity)
-            elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity <= 0):
-                self.noteOff.emit(msg.note)
+            while self.running:
+                if self.paused:
+                    time.sleep(0.01)
+                    continue
+                
+                audio = self.make_chunk(self.chunk)
+                self.stream.write(audio)
 
-        self.finished.emit()
+                self.stream.write(audio)
 
+                chunk_duration = self.chunk / self.sample_rate
 
+                # process all midi events that fall into this chunk
+                elapsed_in_chunk = 0.0
+                while (
+                    event_index < len(events)
+                    and next_event_time is not None
+                    and next_event_time <= chunk_duration - elapsed_in_chunk + 1e-9
+                ):
+                    msg = events[event_index]
+
+                    if msg.type == "note_on" and msg.velocity > 0:
+                        self.active_notes[msg.note] = msg.velocity
+                        self.noteOn.emit(msg.note, msg.velocity)
+
+                    elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
+                        self.active_notes.pop(msg.note, None)
+                        self._phase.pop(msg.note, None)
+                        self.noteOff.emit(msg.note)
+
+                    elapsed_in_chunk += msg.time
+                    event_index += 1
+
+                    if event_index < len(events):
+                        next_event_time = events[event_index].time
+                    else:
+                        next_event_time = None
+                        break
+
+                audio = self.make_chunk(self.chunk)
+                self.stream.write(audio)
+                song_time += chunk_duration
+
+                # subtract this chunk from the next event delay
+                if next_event_time is not None:
+                    next_event_time -= chunk_duration
+                    if next_event_time < 0:
+                        next_event_time = 0.0
+
+                # stop automatically when song is done and no notes are ringing
+                if event_index >= len(events) and not self.active_notes:
+                    break
+
+        finally:
+            self.close_audio()
+            self.finished.emit()
+
+    @pyqtSlot(bool)
     def setMuted(self, muted: bool):
         self.muted = muted
-        if self.audioPlayer is not None:
-            # depends on what audio system you use later
-            # self.audioPlayer.setMuted(muted)
-            # or:
-            # self.audioPlayer.setVolume(0 if muted else 100)
-            pass
 
-
-    def stop(self):
-        self.running = False
-
-
+    @pyqtSlot()
     def pause(self):
         self.paused = True
 
-
+    @pyqtSlot()
     def resume(self):
         self.paused = False
+
+    @pyqtSlot()
+    def stop(self):
+        self.running = False
 
 
 class MidiFeed(QWidget):
@@ -128,24 +249,29 @@ class MidiFeed(QWidget):
         if self.thread is not None:
             self.stop()
 
-        self.thread = QThread()
-        self.worker = MidiWorker(self.pathInput.text())
-        try:
-            self.muteChanged.disconnect()
-        except:
-            pass
+        path = self.pathInput.text().strip()
+        if not path:
+            return
 
-        self.muteChanged.connect(self.worker.setMuted)
+        self.thread = QThread()
+        self.worker = MidiWorker(path)
 
         self.worker.moveToThread(self.thread)
+
+        self.muteChanged.connect(self.worker.setMuted)
+        self.worker.setMuted(self.muteCheckBox.isChecked())
 
         self.thread.started.connect(self.worker.run)
         self.worker.noteOn.connect(self.handleNoteOn)
         self.worker.noteOff.connect(self.handleNoteOff)
+        self.worker.finished.connect(self.onPlaybackFinished)
         self.worker.finished.connect(self.thread.quit)
 
         self.thread.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
+
+        self.muteChanged.connect(self.worker.setMuted)
+        self.worker.setMuted(self.muteCheckBox.isChecked())
 
         self.thread.start()
 
@@ -156,7 +282,6 @@ class MidiFeed(QWidget):
                 self.worker.resume()
             else:
                 self.worker.pause()
-
 
     def stop(self):
         if self.worker:
@@ -169,10 +294,8 @@ class MidiFeed(QWidget):
         self.worker = None
         self.thread = None
 
-        # Optional: clear active highlighting when stopped
         for note in list(self.activeNoteItems.keys()):
             self.handleNoteOff(note)
-
 
     def onPlaybackFinished(self):
         self.worker = None
