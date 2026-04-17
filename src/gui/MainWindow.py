@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QAction, QIcon, QPixmap
-from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtCore import Qt, QSize
 from src.video.video import VideoFeed
 from src.audio.midi import MidiFeed
 from src.audio.audio import AudioFeed
-import math
+from src.tools.VideoLoader import VideoLoader
 
 class WidgetData():
     def __init__(self, widget: QWidget = None, ID: int = 0):
@@ -33,7 +33,9 @@ class MainWindow(QMainWindow):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.contextMenu)
         self.setWindowTitle("Data Colector")
+        self.setMinimumSize(QSize(600, 400))
         self.showMaximized()
+        
         self.addBaseWidget()
         self.windowNumber = 0
         self.windows = [[WidgetData() for _ in range(4)] for _ in range(2)]
@@ -43,6 +45,8 @@ class MainWindow(QMainWindow):
         self.fondLayout = QGridLayout()
         self.fondLayout.setSpacing(10)
         self.fond.setLayout(self.fondLayout)
+        self.dialog = WindowChoice(self)
+        self.videoTool = VideoLoader()
 
         self.addTopMenu()
         self.addMenuBar()
@@ -55,7 +59,8 @@ class MainWindow(QMainWindow):
 
         self.toolbar = QToolBar()
         self.addToolBar(self.toolbar)
-        self.dialog = WindowChoice(self)
+        
+
 
         self.quickAccess = [QAction("Add/Remove a window", self),
                             QAction("Remove All windows"),
@@ -98,7 +103,9 @@ class MainWindow(QMainWindow):
                               QAction("Sync Video", self),
                               QAction("Show Delays",self)]
         
-        self.toolOptions2 = [QAction("Preload Video", self)]
+        self.toolOptions2 = [QAction("Preload Video", self),
+                             QAction("Export Key Frames",self)]
+        self.toolOptions2[0].triggered.connect(self.videoTool.exec)
 
         self.menu = self.menuBar()
         self.fileMenu = self.menu.addMenu("&Files")
