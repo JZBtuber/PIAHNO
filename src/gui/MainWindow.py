@@ -1,9 +1,9 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtCore import Qt, QThread
-from src.gui.layout_colorwidget import Color
 from src.video.video import VideoFeed
 from src.audio.midi import MidiFeed
+from src.audio.audio import AudioFeed
 import math
 
 class WidgetData():
@@ -166,8 +166,12 @@ class WindowChoice(QDialog):
         addWindowButtonMidi = QPushButton("Add a Midi Feed")
         addWindowButtonMidi.clicked.connect(self.setMidi)
         addWindowButtonMidi.clicked.connect(self.addWindow)
+        addWindowButtonAudio = QPushButton("Add a Audio Feed")
+        addWindowButtonAudio.clicked.connect(self.setAudio)
+        addWindowButtonAudio.clicked.connect(self.addWindow)
         hor1.addWidget(addWindowButtonVideo)
         hor1.addWidget(addWindowButtonMidi)
+        hor1.addWidget(addWindowButtonAudio)
         vert.addLayout(hor1)
         self.setLayout(vert)
         self.widget = None
@@ -177,6 +181,9 @@ class WindowChoice(QDialog):
 
     def setMidi(self):
         self.widget = MidiFeed
+
+    def setAudio(self):
+        self.widget = AudioFeed
 
     def addWindow(self, checked = False):
         self.mainWindow.addWindow(self.widget)

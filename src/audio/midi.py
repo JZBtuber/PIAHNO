@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import QCheckBox, QWidget, QHBoxLayout, QVBoxLayout, QListW
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QColor
 import time
-import math
 import numpy as np
 import pyaudio
 
@@ -163,9 +162,13 @@ class MidiWorker(QObject):
             self.close_audio()
             self.finished.emit()
 
-    @pyqtSlot(bool)
-    def setMuted(self, muted: bool):
-        self.muted = muted
+    @pyqtSlot()
+    def setMuted(self):
+        self.muted = True
+
+    @pyqtSlot()
+    def resetMuted(self):
+        self.muted = False
 
     @pyqtSlot()
     def pause(self):
@@ -181,8 +184,6 @@ class MidiWorker(QObject):
 
 
 class MidiFeed(QWidget):
-    muteChanged = pyqtSignal(bool)
-
     def __init__(self, ID: int):
         super().__init__()
 
@@ -206,7 +207,7 @@ class MidiFeed(QWidget):
         self.startButton.clicked.connect(self.start)
         self.pauseButton.clicked.connect(self.pause)
         self.stopButton.clicked.connect(self.stop)
-        self.muteCheckBox.toggled.connect(self.muteChanged.emit)
+        self.muteCheckBox.clicked.connect(self.muteChanged)
 
         #Control layout
         controlsLayout = QHBoxLayout()
@@ -238,6 +239,13 @@ class MidiFeed(QWidget):
         self.worker = None
 
 
+    def muteChanged(self, s):
+        if self.worker:
+            if s :
+                self.worker.setMuted()
+            else:
+                self.worker.resetMuted()
+
     def midiNoteToName(self, note: int) -> str:
         names = ["C", "C#", "D", "D#", "E", "F",
                  "F#", "G", "G#", "A", "A#", "B"]
@@ -258,10 +266,14 @@ class MidiFeed(QWidget):
 
         self.worker.moveToThread(self.thread)
 
-        self.muteChanged.connect(self.worker.setMuted)
-        self.worker.setMuted(self.muteCheckBox.isChecked())
-
+        
         self.thread.started.connect(self.worker.run)
+
+        if self.muteCheckBox.isChecked():
+            self.thread.started.connect(self.worker.setMuted)
+        else:
+            self.thread.started.connect(self.worker.resetMuted)
+
         self.worker.noteOn.connect(self.handleNoteOn)
         self.worker.noteOff.connect(self.handleNoteOff)
         self.worker.finished.connect(self.onPlaybackFinished)
@@ -269,9 +281,6 @@ class MidiFeed(QWidget):
 
         self.thread.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-
-        self.muteChanged.connect(self.worker.setMuted)
-        self.worker.setMuted(self.muteCheckBox.isChecked())
 
         self.thread.start()
 
