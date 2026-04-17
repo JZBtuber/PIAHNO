@@ -6,8 +6,9 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, Qt
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import (
     QCheckBox, QWidget, QHBoxLayout, QVBoxLayout,
-    QLabel, QPushButton, QLineEdit
+    QLabel, QPushButton, QFileDialog
 )
+from src.gui.FileSystem import FileDropLineEdit
 
 
 class AudioWorker(QObject):
@@ -210,8 +211,18 @@ class AudioFeed(QWidget):
         controlsLayout.addWidget(self.muteCheckBox)
         controlsLayout.addStretch()
 
-        self.pathInput = QLineEdit()
-        self.pathInput.setPlaceholderText("Wav path...")
+        self.pathInput = FileDropLineEdit()
+        self.pathInput.setPlaceholderText("Video path...")
+
+        #Browse button
+        self.browseButton = QPushButton("Browse")
+        self.browseButton.clicked.connect(self.browseFile)
+
+        #Path input layout
+        self.pathLayout = QHBoxLayout()
+        self.pathLayout.addWidget(self.pathInput, 1)
+        self.pathLayout.addWidget(self.browseButton, 0)
+
 
         self.visualizer = AudioVisualizer()
         self.statusLabel = QLabel("Stopped")
@@ -221,7 +232,7 @@ class AudioFeed(QWidget):
         self.mainLayout.addWidget(QLabel("Audio"), 0)
         self.mainLayout.addWidget(self.visualizer, 1)
         self.mainLayout.addLayout(controlsLayout, 0)
-        self.mainLayout.addWidget(self.pathInput, 0)
+        self.mainLayout.addLayout(self.pathLayout, 0)
         self.mainLayout.addWidget(self.statusLabel, 0)
         self.mainLayout.addStretch()
         self.setLayout(self.mainLayout)
@@ -300,3 +311,14 @@ class AudioFeed(QWidget):
 
     def onError(self, message: str):
         self.statusLabel.setText(f"Error: {message}")
+
+
+    def browseFile(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select audio file",
+            "",
+            "WAV Files (*.wav);;All Files (*)"
+        )
+        if path:
+            self.pathInput.setText(path)

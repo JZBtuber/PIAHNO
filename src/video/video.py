@@ -1,11 +1,12 @@
 import cv2
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot, Qt
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout, QCheckBox, QSizePolicy, QHBoxLayout, QLineEdit, QPushButton, QSpinBox
+from PyQt6.QtWidgets import QLabel, QWidget,QFileDialog, QVBoxLayout, QCheckBox, QSizePolicy, QHBoxLayout, QLineEdit, QPushButton, QSpinBox
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+from src.gui.FileSystem import FileDropLineEdit
 
 
 class VideoWorker(QObject):
@@ -149,7 +150,7 @@ class VideoFeed(QWidget):
 
         #Creating the widgets
         #ID counter
-        self.IDlabel = QLabel(str(self.ID))
+        self.IDlabel = QLabel(f"{self.ID} Video")
         #Video feed
         self.video = QLabel()
         self.video.setMinimumSize(320, 240)
@@ -190,8 +191,17 @@ class VideoFeed(QWidget):
         self.cameraControl.addStretch()
 
         #Video path
-        self.pathInput = QLineEdit()
+        self.pathInput = FileDropLineEdit()
         self.pathInput.setPlaceholderText("Video path...")
+
+        #Browse button
+        self.browseButton = QPushButton("Browse")
+        self.browseButton.clicked.connect(self.browseFile)
+
+        #Path input layout
+        self.pathLayout = QHBoxLayout()
+        self.pathLayout.addWidget(self.pathInput, 1)
+        self.pathLayout.addWidget(self.browseButton, 0)
 
         #Algorithm settings
         #Activate the Mediapipe algorithm
@@ -214,7 +224,7 @@ class VideoFeed(QWidget):
         layout.addLayout(controlsLayout, 0)
         layout.addLayout(self.cameraControl, 0)
         layout.addLayout(self.algorithm, 0)
-        layout.addWidget(self.pathInput, 0)
+        layout.addLayout(self.pathLayout, 0)
         layout.addStretch()
 
         #Defining the thread and worker
@@ -309,3 +319,14 @@ class VideoFeed(QWidget):
             self.video.update()
 
         super().resizeEvent(event)
+
+
+    def browseFile(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select audio file",
+            "",
+            "MOV Files (*.MOV);;All Files (*)"
+        )
+        if path:
+            self.pathInput.setText(path)

@@ -1,10 +1,12 @@
 from mido import MidiFile
-from PyQt6.QtWidgets import QCheckBox, QWidget, QHBoxLayout, QVBoxLayout, QListWidgetItem, QLabel, QListWidget, QPushButton, QLineEdit
+from PyQt6.QtWidgets import QCheckBox, QWidget, QFileDialog, QHBoxLayout, QVBoxLayout, QListWidgetItem, QLabel, QListWidget, QPushButton, QLineEdit
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QColor
+from src.gui.FileSystem import FileDropLineEdit
 import time
 import numpy as np
 import pyaudio
+
 
 
 class MidiWorker(QObject):
@@ -218,8 +220,18 @@ class MidiFeed(QWidget):
         controlsLayout.addStretch()
 
         #Video path
-        self.pathInput = QLineEdit()
-        self.pathInput.setPlaceholderText("Midi path...")
+        self.pathInput = FileDropLineEdit()
+        self.pathInput.setPlaceholderText("Video path...")
+
+        #Browse button
+        self.browseButton = QPushButton("Browse")
+        self.browseButton.clicked.connect(self.browseFile)
+
+        #Path input layout
+        self.pathLayout = QHBoxLayout()
+        self.pathLayout.addWidget(self.pathInput, 1)
+        self.pathLayout.addWidget(self.browseButton, 0)
+
 
         #Note lists
         self.noteList = QListWidget()
@@ -231,7 +243,7 @@ class MidiFeed(QWidget):
         self.mainLayout.addWidget(QLabel("Notes"), 0)
         self.mainLayout.addWidget(self.noteList, 1)
         self.mainLayout.addLayout(controlsLayout, 0)
-        self.mainLayout.addWidget(self.pathInput, 0)
+        self.mainLayout.addLayout(self.pathLayout, 0)
         self.mainLayout.addStretch()
         self.setLayout(self.mainLayout)
 
@@ -338,6 +350,17 @@ class MidiFeed(QWidget):
 
             self.noteList.takeItem(self.noteList.row(item))
             self.noteList.insertItem(len(self.activeNoteItems), item)
+
+
+    def browseFile(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select audio file",
+            "",
+            "MID Files (*.mid);;All Files (*)"
+        )
+        if path:
+            self.pathInput.setText(path)
 
         
 
