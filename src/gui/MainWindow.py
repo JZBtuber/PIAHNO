@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         self.fond.setLayout(self.fondLayout)
 
         self.addTopMenu()
-
+        self.addMenuBar()
 
 
         self.setCentralWidget(self.fond)
@@ -81,9 +81,9 @@ class MainWindow(QMainWindow):
         self.quickAccess[5].triggered.connect(self.stopALL)
 
         self.toolbar.addActions(self.quickAccess)
-        
 
 
+    def addMenuBar(self):
         self.filesOptions = [QAction("Save", self),
                              QAction("Load", self),
                              QAction("Export", self)
@@ -94,18 +94,28 @@ class MainWindow(QMainWindow):
                             ]
         self.editOptions[1].triggered.connect(self.dialog.exec)
 
+        self.toolOptions1 = [QAction("Sync Midi", self),
+                              QAction("Sync Video", self),
+                              QAction("Show Delays",self)]
+        
+        self.toolOptions2 = [QAction("Preload Video", self)]
+
+
+
 
         self.menu = self.menuBar()
         self.fileMenu = self.menu.addMenu("&Files")
         self.editMenu = self.menu.addMenu("&Edit")
+        self.toolMenu = self.menu.addMenu("&Tools")
 
-        for o in self.filesOptions:
-            self.fileMenu.addSeparator
-            self.fileMenu.addAction(o)
-
-        for o in self.editOptions:
-            self.editMenu.addSeparator
-            self.editMenu.addAction(o)
+        
+        self.fileMenu.addActions(self.filesOptions)
+        
+        self.editMenu.addActions(self.editOptions)
+        
+        self.toolMenu.addActions(self.toolOptions1)
+        self.toolMenu.addSeparator()
+        self.toolMenu.addActions(self.toolOptions2)
 
 
     def addWindow(self, widgetClass):
