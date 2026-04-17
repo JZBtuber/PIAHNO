@@ -15,6 +15,14 @@ class WidgetData():
     def setID(self, ID: int):
         self.ID = ID
 
+    
+    def getID(self):
+        return self.ID
+    
+
+    def getWidget(self):
+        return self.widget
+
 
 class MainWindow(QMainWindow):
 
@@ -49,24 +57,28 @@ class MainWindow(QMainWindow):
         self.addToolBar(self.toolbar)
         self.dialog = WindowChoice(self)
 
-        self.quickAccess = [QAction("Add a window", self),
+        self.quickAccess = [QAction("Add/Remove a window", self),
+                            QAction("Remove All windows"),
                             QAction("Save project", self),
                             QAction("Start", self),
                             QAction("Pause/Resume", self),
-                            QAction("Stop",self)]
+                            QAction("Stop",self)
+                            ]
         
-        self.quickAccess[0].setStatusTip("Add an observation window")
-        self.quickAccess[1].setStatusTip("Save the current project setup")
-        self.quickAccess[2].setStatusTip("Start all video/audio")
-        self.quickAccess[3].setStatusTip("Pause and resume all video/audio")
-        self.quickAccess[4].setStatusTip("Stop all video/audio")
+        self.quickAccess[0].setStatusTip("Add or remove an observation window")
+        self.quickAccess[1].setStatusTip("Remove all observation windows")
+        self.quickAccess[2].setStatusTip("Save the current project setup")
+        self.quickAccess[3].setStatusTip("Start all video/audio")
+        self.quickAccess[4].setStatusTip("Pause and resume all video/audio")
+        self.quickAccess[5].setStatusTip("Stop all video/audio")
 
 
         self.quickAccess[0].triggered.connect(self.dialog.exec)
+        self.quickAccess[1].triggered.connect(self.removeAllWindow)
 
-        self.quickAccess[2].triggered.connect(self.startALL)
-        self.quickAccess[3].triggered.connect(self.pauseALL)
-        self.quickAccess[4].triggered.connect(self.stopALL)
+        self.quickAccess[3].triggered.connect(self.startALL)
+        self.quickAccess[4].triggered.connect(self.pauseALL)
+        self.quickAccess[5].triggered.connect(self.stopALL)
 
         self.toolbar.addActions(self.quickAccess)
         
@@ -105,11 +117,33 @@ class MainWindow(QMainWindow):
                     jData.widget = widget
                     jData.setID(int(i * 4 + j + 1))
                     self.fondLayout.addWidget(widget, int(i), int(j))
-                    done = True
-                if done: break
-            if done: break
+                    return
 
-            
+    
+    def removeWindow(self, ID: int):
+        for row in self.windows:
+            for window in row:
+                if window.getID() == ID:
+                    widget = window.getWidget()
+                    if widget is not None:
+                        self.fondLayout.removeWidget(widget)
+                        widget.setParent(None)
+
+                    window.setID(0)
+                    window.widget = None
+                    return
+                
+
+    def removeAllWindow(self):
+        for row in self.windows:
+            for window in row:
+                widget = window.getWidget()
+                if not widget == None:
+                    self.fondLayout.removeWidget(widget)
+                    widget.setParent = None
+                    window.setID(0)
+                    window.widget = None
+                    
 
     def startALL(self):
         for i in self.windows:
@@ -159,7 +193,13 @@ class WindowChoice(QDialog):
         super().__init__()
         self.mainWindow = MainWindow
         vert = QVBoxLayout()
+        hor0 = QHBoxLayout()
         hor1 = QHBoxLayout()
+
+        removeWindowButton = QPushButton("Remove the window number:")
+        self.removeWindowSpinBox = QSpinBox()
+        removeWindowButton.clicked.connect(self.removeWindow)
+
         addWindowButtonVideo = QPushButton("Add a Video Feed")
         addWindowButtonVideo.clicked.connect(self.setVideo)
         addWindowButtonVideo.clicked.connect(self.addWindow)
@@ -169,9 +209,15 @@ class WindowChoice(QDialog):
         addWindowButtonAudio = QPushButton("Add a Audio Feed")
         addWindowButtonAudio.clicked.connect(self.setAudio)
         addWindowButtonAudio.clicked.connect(self.addWindow)
+
+        hor0.addWidget(removeWindowButton)
+        hor0.addWidget(self.removeWindowSpinBox)
+
         hor1.addWidget(addWindowButtonVideo)
         hor1.addWidget(addWindowButtonMidi)
         hor1.addWidget(addWindowButtonAudio)
+
+        vert.addLayout(hor0)
         vert.addLayout(hor1)
         self.setLayout(vert)
         self.widget = None
@@ -187,6 +233,11 @@ class WindowChoice(QDialog):
 
     def addWindow(self, checked = False):
         self.mainWindow.addWindow(self.widget)
+        self.close()
+
+
+    def removeWindow(self):
+        self.mainWindow.removeWindow(self.removeWindowSpinBox.value())
         self.close()
 
 
