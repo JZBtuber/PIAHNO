@@ -6,11 +6,13 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+import time
 from src.gui.FileSystem import FileDropLineEdit
 
 
 class VideoWorker(QObject):
     frameReady = pyqtSignal(QImage) #Signal to update a frame
+    fpsReady = pyqtSignal(float)
 
     def __init__(self, path, isCamera = True, cameraNumber = 0):
         super().__init__()
@@ -23,6 +25,7 @@ class VideoWorker(QObject):
         self.useOnlyAlgorithm = False       #Use the Mediapipe algorithm and blackout everything else
         self.running = False                #Is running
         self.paused = False                 #Is paused
+        self.target_dt = 1.0 / 60.0         #Target FPS
 
         self.setMediapipeSettings()
 
@@ -30,44 +33,70 @@ class VideoWorker(QObject):
     def run(self):
         self.running = True
 
-        #Starting video capture
         capture = cv2.VideoCapture(self.cameraNumber if self.isCamera else self.path)
 
-        #Main loop of the video capture
-        while self.running and capture.isOpened():
+        if self.isCamera:
+            source_fps = 60.0
+        else:
+            source_fps = capture.get(cv2.CAP_PROP_FPS)
+            if source_fps <= 1 or source_fps > 240:
+                source_fps = 60.0
 
-            #Pause
+        self.target_dt = 1.0 / source_fps
+        print(f"Detected source FPS: {source_fps}")
+
+        prev_time = time.perf_counter()
+        smoothed_fps = 0.0
+
+        while self.running and capture.isOpened():
+            loop_start = time.perf_counter()
+
             if self.paused:
-                QThread.msleep(50)
+                time.sleep(0.05)
+                prev_time = time.perf_counter()
                 continue
 
-            #Check if a frame was captured
             ret, frame = capture.read()
             if not ret:
                 break
+
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            #If we do now want to use the algorithm, we write the image straight to the output
+
             if not self.useAlgorithm:
-                h, w, ch = rgb_frame.shape
-                qimg = QImage(rgb_frame.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
-                self.frameReady.emit(qimg)
-                continue
+                output = rgb_frame
+            else:
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+                result = self.detector.detect(mp_image)
+                output = self.draw_landmarks_on_image(rgb_frame, result)
 
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame) #Making the Mediapipe image
-
-            #Detects the hands on the screen and annotates the image with them
-            result = self.detector.detect(mp_image)
-            annotated = self.draw_landmarks_on_image(rgb_frame, result)
-
-            #Makes a QImage with the annotated mp Image
-            h, w, ch = annotated.shape
-            qimg = QImage(annotated.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
-
-            #Sends the Annotated Q Image
+            h, w, ch = output.shape
+            qimg = QImage(output.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
             self.frameReady.emit(qimg)
 
-        capture.release()   #Release the camera/file
+            # pace to source fps
+            target_time = loop_start + self.target_dt
+            while True:
+                remaining = target_time - time.perf_counter()
+                if remaining <= 0:
+                    break
+                if remaining > 0.002:
+                    time.sleep(remaining - 0.001)
+
+            # actual delivered fps
+            now = time.perf_counter()
+            dt = now - prev_time
+            prev_time = now
+
+            if dt > 0:
+                instant_fps = 1.0 / dt
+                if smoothed_fps == 0.0:
+                    smoothed_fps = instant_fps
+                else:
+                    smoothed_fps = smoothed_fps * 0.9 + instant_fps * 0.1
+
+                self.fpsReady.emit(smoothed_fps)
+
+        capture.release()
 
 
     def setMediapipeSettings(self): #Setting the Mediapipe default settings
@@ -150,7 +179,7 @@ class VideoFeed(QWidget):
 
         #Creating the widgets
         #ID counter
-        self.IDlabel = QLabel(f"{self.ID} Video")
+        self.IDlabel = QLabel(f"{self.ID} Video   FPS: {0}")
         #Video feed
         self.video = QLabel()
         self.video.setMinimumSize(320, 240)
@@ -261,6 +290,7 @@ class VideoFeed(QWidget):
 
         #Starts the worker if the thread is started
         self.thread.started.connect(self.worker.run)
+        self.worker.fpsReady.connect(self.updateFpsLabel)
 
         #Sets the image when the worker finished making one
         self.worker.frameReady.connect(self.setImage)
@@ -292,6 +322,8 @@ class VideoFeed(QWidget):
 
             self.worker = None              #Deletes them both
             self.thread = None
+
+        self.IDlabel.setText(f"{self.ID} Video   FPS: {0}")
 
 
     @pyqtSlot(QImage)
@@ -330,3 +362,7 @@ class VideoFeed(QWidget):
         )
         if path:
             self.pathInput.setText(path)
+
+    @pyqtSlot(float)
+    def updateFpsLabel(self, fps):
+        self.IDlabel.setText(f"{self.ID} Video   FPS: {fps:.1f}")
