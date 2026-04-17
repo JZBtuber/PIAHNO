@@ -2,7 +2,7 @@ from mido import MidiFile
 from PyQt6.QtWidgets import QCheckBox, QWidget, QFileDialog, QHBoxLayout, QVBoxLayout, QListWidgetItem, QLabel, QListWidget, QPushButton, QLineEdit
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QColor
-from src.gui.FileSystem import FileDropLineEdit
+from src.gui.Core import *
 import time
 import numpy as np
 import pyaudio
@@ -22,7 +22,7 @@ class MidiWorker(QObject):
 
         self.running = False
         self.paused = False
-        self.muted = True
+        self.muted = False
 
         self.p = None
         self.stream = None
@@ -205,7 +205,7 @@ class MidiFeed(QWidget):
         self.pauseButton = QPushButton("Pause/Resume")
         self.stopButton = QPushButton("Stop")
         self.muteCheckBox = QCheckBox("Mute")
-        self.muteCheckBox.setChecked(True)
+        self.muteCheckBox.setChecked(False)
         self.startButton.clicked.connect(self.start)
         self.pauseButton.clicked.connect(self.pause)
         self.stopButton.clicked.connect(self.stop)
@@ -267,10 +267,12 @@ class MidiFeed(QWidget):
 
     def start(self):
         if self.thread is not None:
-            self.stop()
+            return
 
         path = self.pathInput.text().strip()
-        if not path:
+        
+        if not self.checkPath():
+            Message = MessageBox("Path Error!", "The path is empty and needs a file!")
             return
 
         self.thread = QThread()
@@ -361,6 +363,13 @@ class MidiFeed(QWidget):
         )
         if path:
             self.pathInput.setText(path)
+
+
+    def checkPath(self):
+        if self.pathInput.text():
+            return True
+        else:
+            return False
 
         
 

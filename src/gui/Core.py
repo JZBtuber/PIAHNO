@@ -1,5 +1,5 @@
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QLineEdit
+from PyQt6.QtWidgets import QLineEdit, QMessageBox
 
 class FileDropLineEdit(QLineEdit):
     fileDropped = pyqtSignal(str)
@@ -39,6 +39,19 @@ class FileDropLineEdit(QLineEdit):
                 if local_path:
                     self.setText(local_path)
                     self.fileDropped.emit(local_path)
-                    self.event.acceptProposedAction()
+                    event.acceptProposedAction()
                     return
         event.ignore()
+
+
+class MessageBox(QMessageBox):
+    def __init__(self, Name: str, Message: str):
+        super().__init__()
+
+        self.setText(Message)
+        self.setWindowTitle(Name)
+        self.setStandardButtons(QMessageBox.StandardButton.Ok)
+        self.setDefaultButton(QMessageBox.StandardButton.Ok)
+        self.setIcon(QMessageBox.Icon.Warning)
+        self.exec()
+

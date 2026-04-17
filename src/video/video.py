@@ -7,7 +7,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
 import time
-from src.gui.FileSystem import FileDropLineEdit
+from src.gui.Core import *
 
 
 class VideoWorker(QObject):
@@ -272,7 +272,11 @@ class VideoFeed(QWidget):
     def start(self):
         #If the worker already exist, stops it.
         if self.thread is not None:
-            self.stop()
+            return
+        
+        if not self.checkPath() and not self.UseCamera:
+            Message = MessageBox("Path Error!", "The path is empty and needs a file!")
+            return
 
         #Gives to the worker the camera ID or path to video depending on user choice
         path = self.cameraNumber if self.UseCamera else self.pathInput.text()
@@ -362,7 +366,15 @@ class VideoFeed(QWidget):
         )
         if path:
             self.pathInput.setText(path)
+            self.cameraCheckBox.setChecked(False)
 
     @pyqtSlot(float)
     def updateFpsLabel(self, fps):
         self.IDlabel.setText(f"{self.ID} Video   FPS: {fps:.1f}")
+
+
+    def checkPath(self):
+        if self.pathInput.text():
+            return True
+        else:
+            return False

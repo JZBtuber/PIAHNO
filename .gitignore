@@ -209,3 +209,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+src/gui/__pycache__/MainWindow.cpython-313.pyc
+src/gui/__pycache__/MainWindow.cpython-313.pyc

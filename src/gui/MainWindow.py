@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
         self.editOptions = [QAction("Settings", self),
                             QAction("Add and remove windows", self),
                             ]
-        self.editOptions[1].triggered.connect(self.addWindow)
+        self.editOptions[1].triggered.connect(self.dialog.exec)
 
 
         self.menu = self.menuBar()

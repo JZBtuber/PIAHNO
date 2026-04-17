@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QFileDialog
 )
-from src.gui.FileSystem import FileDropLineEdit
+from src.gui.Core import *
 
 
 class AudioWorker(QObject):
@@ -23,7 +23,7 @@ class AudioWorker(QObject):
 
         self.running = False
         self.paused = False
-        self.muted = True
+        self.muted = False
 
         self.p = None
         self.stream = None
@@ -197,7 +197,7 @@ class AudioFeed(QWidget):
         self.pauseButton = QPushButton("Pause/Resume")
         self.stopButton = QPushButton("Stop")
         self.muteCheckBox = QCheckBox("Mute")
-        self.muteCheckBox.setChecked(True)
+        self.muteCheckBox.setChecked(False)
 
         self.startButton.clicked.connect(self.start)
         self.pauseButton.clicked.connect(self.pause)
@@ -247,12 +247,15 @@ class AudioFeed(QWidget):
                 self.statusLabel.setText("Playing")
 
     def start(self):
+        if not self.checkPath():
+            Message = MessageBox("Path Error!", "The path is empty and needs a file!")
+            return
+
         if self.thread is not None:
-            self.stop()
+            return
 
         path = self.pathInput.text().strip()
         if not path:
-            self.statusLabel.setText("No file path")
             return
 
         self.visualizer.clear()
@@ -322,3 +325,10 @@ class AudioFeed(QWidget):
         )
         if path:
             self.pathInput.setText(path)
+
+
+    def checkPath(self):
+        if self.pathInput.text():
+            return True
+        else:
+            return False
