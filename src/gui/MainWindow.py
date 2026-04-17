@@ -100,9 +100,6 @@ class MainWindow(QMainWindow):
         
         self.toolOptions2 = [QAction("Preload Video", self)]
 
-
-
-
         self.menu = self.menuBar()
         self.fileMenu = self.menu.addMenu("&Files")
         self.editMenu = self.menu.addMenu("&Edit")
