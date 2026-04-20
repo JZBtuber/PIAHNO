@@ -294,11 +294,11 @@ class VideoFeed(QWidget):
 
         #Starts the worker if the thread is started
         self.thread.started.connect(self.worker.run)
-        self.worker.fpsReady.connect(self.updateFpsLabel)
+        
 
         #Sets the image when the worker finished making one
         self.worker.frameReady.connect(self.setImage)
-
+        self.worker.fpsReady.connect(self.updateFpsLabel)
         #Sets the thread garbage collection settings
         self.thread.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
@@ -362,7 +362,7 @@ class VideoFeed(QWidget):
             self,
             "Select audio file",
             "",
-            "MOV Files (*.MOV);;All Files (*)"
+            "MP4 Files (*.mp4);;MOV files (*.MOV);;All Files (*)"
         )
         if path:
             self.pathInput.setText(path)
