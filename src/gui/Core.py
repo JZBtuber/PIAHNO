@@ -164,11 +164,15 @@ class basicWindowWidget(QWidget):
         IDLabel = QLabel(str(self.ID))
 
         #Control buttons
-        startButton = QPushButton("Start")
-        pauseButton = QPushButton("Pause/Resume")
+        self.startButton = QPushButton("Start")
+        self.pauseButton = QPushButton("Pause/Resume")
         stopButton = QPushButton("Stop")
-        startButton.clicked.connect(self.start)
-        pauseButton.clicked.connect(self.pause)
+
+        self.startButton.setCheckable(True)
+        self.pauseButton.setCheckable(True)
+
+        self.startButton.clicked.connect(self.start)
+        self.pauseButton.clicked.connect(self.pause)
         stopButton.clicked.connect(self.stop)
         if self.hasAudio:
             self.muteCheckBox = QCheckBox("Mute")
@@ -176,8 +180,8 @@ class basicWindowWidget(QWidget):
             
         #Control layout
         controlsLayout = QHBoxLayout()
-        controlsLayout.addWidget(startButton)
-        controlsLayout.addWidget(pauseButton)
+        controlsLayout.addWidget(self.startButton)
+        controlsLayout.addWidget(self.pauseButton)
         controlsLayout.addWidget(stopButton)
         if self.hasAudio:
             controlsLayout.addWidget(self.muteCheckBox)
@@ -255,6 +259,8 @@ class basicWindowWidget(QWidget):
 
 
     def stop(self):
+        self.startButton.setChecked(False)
+        self.pauseButton.setChecked(False)
         if self.worker is not None:
             self.worker.stop()      #Stop the worker
         if self.thread is not None:

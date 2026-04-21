@@ -17,7 +17,7 @@ class VideoWorker(basicWorker):
     def __init__(self, path):
         super().__init__(path)
 
-        self.isCamera = True                #Using a camera/loading a video
+        self.isLive = True                #Using a camera/loading a video
         self.cameraNumber = 0               #Default camera number for multile camera windows
         self.useAlgorithm = False           #Use the Mediapipe algorithm
         self.useOnlyAlgorithm = False       #Use the Mediapipe algorithm and blackout everything else
@@ -27,8 +27,8 @@ class VideoWorker(basicWorker):
 
 
     def beforeLoop(self):
-        self.capture = cv2.VideoCapture(self.cameraNumber if self.isCamera else self.path)
-        self.target_dt = 1.0 / (self.capture.get(cv2.CAP_PROP_FPS) if not self.isCamera else 60)
+        self.capture = cv2.VideoCapture(self.cameraNumber if self.isLive else self.path)
+        self.target_dt = 1.0 / (self.capture.get(cv2.CAP_PROP_FPS) if not self.isLive else 60)
         self.prevTime = time.perf_counter()
         self.smoothedFps = 0.0
 
@@ -90,8 +90,8 @@ class VideoWorker(basicWorker):
         self.useOnlyAlgorithm = value
 
     
-    def setIsCamera(self, s):
-        self.isCamera = s
+    def setIsLive(self, s):
+        self.isLive = s
 
 
     def setCameraNumber(self, n):
@@ -151,7 +151,7 @@ class VideoFeed(basicWindowWidget):
         super().__init__(VideoWorker, ID)
 
         #Set the default values of variables
-        self.isCamera = True
+        self.isLive = True
         self.useAlgorithm = False
         self.useOnlyAlgorithm = False
         self.cameraNumber = 0
@@ -201,7 +201,7 @@ class VideoFeed(basicWindowWidget):
 
         
     def ChangeUse(self, s):
-        self.isCamera = bool(s)        #Sets if the worker uses the camera or the path
+        self.isLive = bool(s)        #Sets if the worker uses the camera or the path
 
 
     def updateCameraNumber(self, n):    #Sets the ID of the camera to use (0 being default and the first camera)
@@ -214,7 +214,7 @@ class VideoFeed(basicWindowWidget):
         self.worker.setOnlyAlgorithm(self.OnlyHands.isChecked())
 
         #Sets the camera
-        self.worker.setIsCamera(self.isCamera)
+        self.worker.setisLive(self.isLive)
         self.worker.setCameraNumber(self.cameraNumber)
 
 
@@ -240,5 +240,5 @@ class VideoFeed(basicWindowWidget):
         self.FPSLabel.setText(f"FPS: {fps:.1f}")
 
     def checkPath(self, path):
-        return True if self.isCamera else super().checkPath(path)
+        return True if self.isLive else super().checkPath(path)
     
