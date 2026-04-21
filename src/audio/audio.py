@@ -11,29 +11,26 @@ from PyQt6.QtWidgets import (
 from src.gui.Core import *
 
 
-class AudioWorker(QObject):
+class AudioWorker(basicWorker):
     finished = pyqtSignal()
     levelChanged = pyqtSignal(float)
-    error = pyqtSignal(str)
+    
+    def __init__(self, path, chunk: int = 1024):
+        super().__init__(path)
 
-    def __init__(self, wavPath: str, chunk: int = 1024):
-        super().__init__()
-        self.wavPath = wavPath
-        self.chunk = chunk
+        #Defining default variables and objects
+        self.wavPath = path  #Path to the .wav file
+        self.chunk = chunk      #Audio's chunks
+        self.p = None           #Duturely Pyaudio
+        self.stream = None      #Futurely the output stream
+        self.wf = None          #Wave file once opended
 
-        self.running = False
-        self.paused = False
-        self.muted = False
 
-        self.p = None
-        self.stream = None
-        self.wf = None
+    def beforeLoop(self):
+        self.wf = wave.open(self.wavPath, "rb") #Opens the .wav file
 
-    def open_audio(self):
-        self.wf = wave.open(self.wavPath, "rb")
-
-        self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(
+        self.p = pyaudio.PyAudio()  #Creates the Pyaudio object
+        self.stream = self.p.open(  #Creates the stream object
             format=self.p.get_format_from_width(self.wf.getsampwidth()),
             channels=self.wf.getnchannels(),
             rate=self.wf.getframerate(),
@@ -41,7 +38,27 @@ class AudioWorker(QObject):
             frames_per_buffer=self.chunk
         )
 
-    def close_audio(self):
+
+    def loop(self):
+        if self.paused: #Handling the pause
+            QThread.msleep(20)
+            return
+
+        data = self.wf.readframes(self.chunk)   #Check if there is data to play
+        if not data:
+            return
+
+        if self.muted:                          #Play silence if muted
+            silent = b"\x00" * len(data)
+            self.stream.write(silent)
+            self.levelChanged.emit(0.0)
+        else:                                   #Plays the audio if not muted
+            self.stream.write(data)
+            self.levelChanged.emit(self.compute_level(data))
+
+
+    def afterLoop(self):
+        #Closing the stream
         if self.stream is not None:
             try:
                 self.stream.stop_stream()
@@ -53,6 +70,7 @@ class AudioWorker(QObject):
                 pass
             self.stream = None
 
+        #Closing the .wav file
         if self.wf is not None:
             try:
                 self.wf.close()
@@ -60,6 +78,7 @@ class AudioWorker(QObject):
                 pass
             self.wf = None
 
+        #Closing the Pyaudio instance
         if self.p is not None:
             try:
                 self.p.terminate()
@@ -67,10 +86,14 @@ class AudioWorker(QObject):
                 pass
             self.p = None
 
+        self.finished.emit()
+
+
     def compute_level(self, data: bytes) -> float:
         if not data or self.wf is None:
             return 0.0
 
+        #Gets the working variables
         sample_width = self.wf.getsampwidth()
         max_possible = float((2 ** (8 * sample_width - 1)) - 1)
 
@@ -79,74 +102,26 @@ class AudioWorker(QObject):
         except Exception:
             return 0.0
 
+        #If note is 0 return 0
         if max_possible <= 0:
             return 0.0
 
         level = rms / max_possible
-        level *= 3.5
-        return max(0.0, min(level, 1.0))
-
-    @pyqtSlot()
-    def run(self):
-        self.running = True
-        self.paused = False
-
-        try:
-            self.open_audio()
-
-            while self.running:
-                if self.paused:
-                    QThread.msleep(20)
-                    continue
-
-                data = self.wf.readframes(self.chunk)
-                if not data:
-                    break
-
-                if self.muted:
-                    silent = b"\x00" * len(data)
-                    self.stream.write(silent)
-                    self.levelChanged.emit(0.0)
-                else:
-                    self.stream.write(data)
-                    self.levelChanged.emit(self.compute_level(data))
-
-        except Exception as e:
-            self.error.emit(str(e))
-
-        finally:
-            self.close_audio()
-            self.finished.emit()
-
-    @pyqtSlot()
-    def setMuted(self):
-        self.muted = True
-
-    @pyqtSlot()
-    def resetMuted(self):
-        self.muted = False
-
-    @pyqtSlot()
-    def pause(self):
-        self.paused = True
-
-    @pyqtSlot()
-    def resume(self):
-        self.paused = False
-
-    @pyqtSlot()
-    def stop(self):
-        self.running = False
+        level *= 35
+        return max(0.0, min(level, 1.0))    #Gets the audio bar's height from the audio
 
 
 class AudioVisualizer(QWidget):
     def __init__(self, bars: int = 16):
-        super().__init__()
+        super().__init__()  
+
+        #Creates the bars
         self.bars = bars
         self.levels = [0.0] * bars
         self.setMinimumHeight(200)
 
-    def pushLevel(self, level: float):
+
+    def pushLevel(self, level: float):      #Push the bars up when the audio plays
         if self.levels:
             prev = self.levels[-1]
             level = prev * 0.45 + level * 0.55
@@ -155,11 +130,13 @@ class AudioVisualizer(QWidget):
         self.levels.append(level)
         self.update()
 
-    def clear(self):
+
+    def clear(self):                        #Clear the bars
         self.levels = [0.0] * self.bars
         self.update()
 
-    def paintEvent(self, event):
+
+    def paintEvent(self, event):            #Paints the bar when a note is played (most is only defining the style)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -176,159 +153,39 @@ class AudioVisualizer(QWidget):
         painter.setBrush(QColor("#4da3ff"))
 
         x = margin
-        for level in self.levels:
+        for level in self.levels:   #Prints the levels the the hights
             h = max(6, int(max_height * level))
             y = rect.height() - h - 8
             painter.drawRoundedRect(x, y, bar_width, h, 4, 4)
             x += bar_width + gap
 
 
-class AudioFeed(QWidget):
-    def __init__(self, ID: int = 0):
-        super().__init__()
-
-        self.ID = ID
-        self.thread = None
-        self.worker = None
-
-        self.IDlabel = QLabel(str(self.ID))
-
-        self.startButton = QPushButton("Start")
-        self.pauseButton = QPushButton("Pause/Resume")
-        self.stopButton = QPushButton("Stop")
-        self.muteCheckBox = QCheckBox("Mute")
-        self.muteCheckBox.setChecked(False)
-
-        self.startButton.clicked.connect(self.start)
-        self.pauseButton.clicked.connect(self.pause)
-        self.stopButton.clicked.connect(self.stop)
-        self.muteCheckBox.clicked.connect(self.muteChanged)
-
-        controlsLayout = QHBoxLayout()
-        controlsLayout.addWidget(self.startButton)
-        controlsLayout.addWidget(self.pauseButton)
-        controlsLayout.addWidget(self.stopButton)
-        controlsLayout.addWidget(self.muteCheckBox)
-        controlsLayout.addStretch()
-
-        self.pathInput = FileDropLineEdit()
-        self.pathInput.setPlaceholderText("Video path...")
-
-        #Browse button
-        self.browseButton = QPushButton("Browse")
-        self.browseButton.clicked.connect(self.browseFile)
-
-        #Path input layout
-        self.pathLayout = QHBoxLayout()
-        self.pathLayout.addWidget(self.pathInput, 1)
-        self.pathLayout.addWidget(self.browseButton, 0)
-
+class AudioFeed(basicWindowWidget):
+    def __init__(self, ID: int):
+        super().__init__(AudioWorker, ID, True)
 
         self.visualizer = AudioVisualizer()
-        self.statusLabel = QLabel("Stopped")
+        self.mainWidget = self.visualizer
+        self.hasAudio = True
 
-        self.mainLayout = QVBoxLayout()
-        self.mainLayout.addWidget(self.IDlabel, 0)
-        self.mainLayout.addWidget(QLabel("Audio"), 0)
-        self.mainLayout.addWidget(self.visualizer, 1)
-        self.mainLayout.addLayout(controlsLayout, 0)
-        self.mainLayout.addLayout(self.pathLayout, 0)
-        self.mainLayout.addWidget(self.statusLabel, 0)
-        self.mainLayout.addStretch()
-        self.setLayout(self.mainLayout)
+        self.makeBasicWidget()
 
-    def muteChanged(self, checked):
-        if self.worker:
-            if checked:
-                self.worker.setMuted()
-                self.statusLabel.setText("Muted")
-            else:
-                self.worker.resetMuted()
-                self.statusLabel.setText("Playing")
 
-    def start(self):
-        if not self.checkPath():
-            Message = MessageBox("Path Error!", "The path is empty and needs a file!")
-            return
-
-        if self.thread is not None:
-            return
-
-        path = self.pathInput.text().strip()
-        if not path:
-            return
-
-        self.visualizer.clear()
-        self.statusLabel.setText("Playing")
-
-        self.thread = QThread()
-        self.worker = AudioWorker(path)
-        self.worker.moveToThread(self.thread)
-
-        self.thread.started.connect(self.worker.run)
-
-        if self.muteCheckBox.isChecked():
-            self.thread.started.connect(self.worker.setMuted)
-        else:
-            self.thread.started.connect(self.worker.resetMuted)
-
+    def connectAll(self):
         self.worker.levelChanged.connect(self.visualizer.pushLevel)
-        self.worker.error.connect(self.onError)
         self.worker.finished.connect(self.onPlaybackFinished)
-        self.worker.finished.connect(self.thread.quit)
-
-        self.thread.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-
-        self.thread.start()
-
-    def pause(self):
-        if self.worker:
-            if self.worker.paused:
-                self.worker.resume()
-                if self.muteCheckBox.isChecked():
-                    self.statusLabel.setText("Muted")
-                else:
-                    self.statusLabel.setText("Playing")
-            else:
-                self.worker.pause()
-                self.statusLabel.setText("Paused")
-
-    def stop(self):
-        if self.worker:
-            self.worker.stop()
-
-        if self.thread:
-            self.thread.quit()
-            self.thread.wait()
-
-        self.worker = None
-        self.thread = None
-        self.statusLabel.setText("Stopped")
-        self.visualizer.clear()
-
-    def onPlaybackFinished(self):
-        self.worker = None
-        self.thread = None
-        self.statusLabel.setText("Finished")
-
-    def onError(self, message: str):
-        self.statusLabel.setText(f"Error: {message}")
-
-
+        
     def browseFile(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select audio file",
             "",
-            "WAV Files (*.wav);;All Files (*)"
+            "Wave Files (*wav);;All Files (*)"
         )
         if path:
             self.pathInput.setText(path)
+        
 
-
-    def checkPath(self):
-        if self.pathInput.text():
-            return True
-        else:
-            return False
+    def onPlaybackFinished(self):
+        self.worker = None
+        self.thread = None

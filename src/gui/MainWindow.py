@@ -123,7 +123,6 @@ class MainWindow(QMainWindow):
 
 
     def addWindow(self, widgetClass):
-        done = False
         for i, iData in enumerate(self.windows):
             for j, jData in enumerate(iData):
                 if jData.widget is None:
