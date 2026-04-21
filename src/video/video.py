@@ -2,6 +2,7 @@ import cv2
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot, Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget,QFileDialog, QVBoxLayout, QCheckBox, QSizePolicy, QHBoxLayout, QLineEdit, QPushButton, QSpinBox
+from PyQt6.QtMultimedia import QMediaDevices
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -14,10 +15,9 @@ class VideoWorker(basicWorker):
     frameReady = pyqtSignal(QImage) #Signal to update a frame
     fpsReady = pyqtSignal(float)
 
-    def __init__(self, path):
-        super().__init__(path)
+    def __init__(self, path, isLive):
+        super().__init__(path, isLive)
 
-        self.isLive = True                #Using a camera/loading a video
         self.cameraNumber = 0               #Default camera number for multile camera windows
         self.useAlgorithm = False           #Use the Mediapipe algorithm
         self.useOnlyAlgorithm = False       #Use the Mediapipe algorithm and blackout everything else
@@ -27,8 +27,10 @@ class VideoWorker(basicWorker):
 
 
     def beforeLoop(self):
-        self.capture = cv2.VideoCapture(self.cameraNumber if self.isLive else self.path)
-        self.target_dt = 1.0 / (self.capture.get(cv2.CAP_PROP_FPS) if not self.isLive else 60)
+        path = self.path if not self.isLive else int(self.path)
+        print("Path")
+        self.capture = cv2.VideoCapture(path)
+        self.target_dt = 1.0 / (self.capture.get(cv2.CAP_PROP_FPS) if not self.capture.get(cv2.CAP_PROP_FPS) == 0 else 60)
         self.prevTime = time.perf_counter()
         self.smoothedFps = 0.0
 
@@ -89,14 +91,6 @@ class VideoWorker(basicWorker):
     def setOnlyAlgorithm(self, value: bool): #Set if we write the result on a black screen
         self.useOnlyAlgorithm = value
 
-    
-    def setIsLive(self, s):
-        self.isLive = s
-
-
-    def setCameraNumber(self, n):
-        self.cameraNumber = n
-
 
     def setMediapipeSettings(self): #Setting the Mediapipe default settings
         base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
@@ -151,27 +145,16 @@ class VideoFeed(basicWindowWidget):
         super().__init__(VideoWorker, ID)
 
         #Set the default values of variables
-        self.isLive = True
         self.useAlgorithm = False
         self.useOnlyAlgorithm = False
         self.cameraNumber = 0
+        self.inputType = "video"
 
 
         #Main widget of the page
         self.mainWidget = QLabel()
         self.mainWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.mainWidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
-        #Camera settings
-        #Use the camera
-        self.cameraCheckBox = QCheckBox("Use Camera")
-        self.cameraCheckBox.setChecked(True)
-        self.cameraCheckBox.stateChanged.connect(self.ChangeUse)
-
-        #Camera ID number
-        self.cameraNumberInput = QSpinBox()
-        self.cameraNumberInput.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.cameraNumberInput.valueChanged.connect(self.updateCameraNumber)
 
         #Algorithm settings
         #Activate the Mediapipe algorithm
@@ -188,8 +171,6 @@ class VideoFeed(basicWindowWidget):
 
         self.horizontalControlLayout = QHBoxLayout()
         self.horizontalControlLayout.setSpacing(5)
-        self.horizontalControlLayout.addWidget(self.cameraCheckBox)
-        self.horizontalControlLayout.addWidget(self.cameraNumberInput)
         self.horizontalControlLayout.addWidget(self.Hands)
         self.horizontalControlLayout.addWidget(self.OnlyHands)
         self.horizontalControlLayout.addStretch()
@@ -198,10 +179,6 @@ class VideoFeed(basicWindowWidget):
         self.controlLayout.addWidget(self.FPSLabel)
 
         self.makeBasicWidget()
-
-        
-    def ChangeUse(self, s):
-        self.isLive = bool(s)        #Sets if the worker uses the camera or the path
 
 
     def updateCameraNumber(self, n):    #Sets the ID of the camera to use (0 being default and the first camera)
@@ -212,11 +189,6 @@ class VideoFeed(basicWindowWidget):
         #Sets to use the algorithm if the checkbox is set
         self.worker.setAlgorithm(self.Hands.isChecked())
         self.worker.setOnlyAlgorithm(self.OnlyHands.isChecked())
-
-        #Sets the camera
-        self.worker.setisLive(self.isLive)
-        self.worker.setCameraNumber(self.cameraNumber)
-
 
         #Sets the image when the worker finished making one
         self.worker.frameReady.connect(self.setImage)

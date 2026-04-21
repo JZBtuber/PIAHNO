@@ -139,6 +139,7 @@ class MainWindow(QMainWindow):
                 if window.getID() == ID:
                     widget = window.getWidget()
                     if widget is not None:
+                        widget.stop()
                         self.fondLayout.removeWidget(widget)
                         widget.setParent(None)
 
@@ -152,6 +153,7 @@ class MainWindow(QMainWindow):
             for window in row:
                 widget = window.getWidget()
                 if not widget == None:
+                    widget.stop()
                     self.fondLayout.removeWidget(widget)
                     widget.setParent = None
                     window.setID(0)

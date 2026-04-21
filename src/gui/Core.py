@@ -1,6 +1,9 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
-from PyQt6.QtWidgets import QFileDialog, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
-import time
+from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtMultimedia import QMediaDevices
+import pyaudio
+import cv2
+import mido
 
 
 class FileDropLineEdit(QLineEdit):
@@ -84,13 +87,14 @@ class MessageBox(QMessageBox):
 
 class basicWorker(QObject):
     finished = pyqtSignal()
-    def __init__(self, path:str):
+    def __init__(self, path, isLive):
         super().__init__()
 
         #Defining default variables
         self.running = False
         self.paused = False
         self.muted = False
+        self.isLive = isLive
         self.path = path
 
 
@@ -130,6 +134,10 @@ class basicWorker(QObject):
     @pyqtSlot(bool)
     def mute(self, s):
         self.muted = s
+
+    
+        
+            
     
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)
@@ -139,15 +147,19 @@ class basicWindowWidget(QWidget):
 
         #Setting the default variables
         self.ID = ID
-        self.path = ""
+        self.filePath: str = ""
+        self.livePath: str = ""
+        self.path: str = ""
         self.mainWidget = None
         self.controlLayout = None
         self.hasAudio = hasAudio
         self.thread = None
         self.worker = None
         self.workerClass = workerClass
-
-        
+        self.inputType = None
+        self.isLive = False
+        self.devices = []
+        self.isLiveFeed = True
 
         
     def setControlLayout(self, layout):
@@ -187,11 +199,32 @@ class basicWindowWidget(QWidget):
             controlsLayout.addWidget(self.muteCheckBox)
         controlsLayout.addStretch()
 
+        #Device Control
+        self.isLiveCheckbox = QCheckBox("Use live input")
+        self.isLiveCheckbox.toggled.connect(self.setIsLive)
+
+        reloadDevicesButton = QPushButton("Reload Devices")
+        reloadDevicesButton.clicked.connect(self.reloadDevices)
+
+        self.deviceComboBox = QComboBox()
+        self.deviceComboBox.setPlaceholderText("Device to use")
+        self.getDevices(self.inputType)
+
+        for device in self.devices:
+            self.deviceComboBox.addItem(device["name"], device["id"])
+
+        self.deviceComboBox.currentIndexChanged.connect(self.updateLivePath)
+
+        deviceControlLayout = QHBoxLayout()
+        deviceControlLayout.addWidget(self.isLiveCheckbox)
+        deviceControlLayout.addWidget(reloadDevicesButton)
+        deviceControlLayout.addWidget(self.deviceComboBox)
+
         #Video path
         self.pathInput = FileDropLineEdit()
         self.pathInput.setPlaceholderText("Video path...")
-        self.pathInput.textChanged.connect(self.updatePath)
-        self.pathInput.fileDropped.connect(self.updatePath)
+        self.pathInput.textChanged.connect(self.updateFilePath)
+        self.pathInput.fileDropped.connect(self.updateFilePath)
 
         #Browse button
         browseButton = QPushButton("Browse")
@@ -213,6 +246,8 @@ class basicWindowWidget(QWidget):
         windowLayout.addLayout(controlsLayout, 0)
         if self.controlLayout is not None:
             windowLayout.addLayout(self.controlLayout, 0)
+        if self.isLiveFeed:
+            windowLayout.addLayout(deviceControlLayout, 0)
         windowLayout.addLayout(pathLayout, 0)
         self.setLayout(windowLayout)
         
@@ -221,15 +256,17 @@ class basicWindowWidget(QWidget):
         #If the worker already exist
         if self.thread is not None:
             return
-
+        
         #Check if the path is valid
+        self.setPathOptions(self.isLiveCheckbox.isChecked())
         if not self.checkPath(self.path):
             Message = MessageBox("Path Error!", "The path is empty and needs a file!")
             return
-        
+
         #Create and initialize the thread and worker
         self.thread = QThread()
-        self.worker = self.workerClass(self.path)
+        
+        self.worker = self.workerClass(self.path, self.isLive)
 
         #Sends the worker to the thread
         self.worker.moveToThread(self.thread)
@@ -258,6 +295,14 @@ class basicWindowWidget(QWidget):
             self.worker.paused = not self.worker.paused
 
 
+    def updateFilePath(self):
+        self.filePath = self.pathInput.text()
+
+
+    def setIsLive(self, s: bool):
+        self.isLive = s
+
+
     def stop(self):
         self.startButton.setChecked(False)
         self.pauseButton.setChecked(False)
@@ -274,9 +319,16 @@ class basicWindowWidget(QWidget):
         if self.worker is not None:
             self.worker.mute(s)
 
+    
+    def updateLivePath(self):
+        self.livePath = self.deviceComboBox.currentData()
+        
 
-    def updatePath(self, path):
-        self.path = path
+    def setPathOptions(self, s: bool):
+        if s:
+            self.path = self.livePath
+        else:
+            self.path = self.filePath
 
 
     def browseFile(self):
@@ -300,3 +352,69 @@ class basicWindowWidget(QWidget):
     def connectAll(self):
         print("Make all connections")
 
+
+    def reloadDevices(self,):
+        self.getDevices(self.inputType)
+
+
+    def getDevices(self, backend: str):
+        self.devices = []
+
+        if backend == "video":
+            self.devices = self.getVideoDevicesCV2()
+        elif backend == "audio":
+            self.devices = self.getAudioDevicesPyAudio()
+        elif backend == "midi":
+            self.devices = self.getMidiInputDevices()
+        else:
+            raise ValueError(f"Unknown backend: {backend}")
+
+
+    def getVideoDevicesCV2(self, max_devices: int = 5):
+        devices = []
+
+        for i in range(max_devices):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                devices.append({
+                    "id": i,
+                    "name": f"Camera {i}"
+                })
+                cap.release()
+
+        return devices
+    
+
+    def getAudioDevicesPyAudio(self):
+        devices = []
+        p = pyaudio.PyAudio()
+
+        try:
+            for i in range(p.get_device_count()):
+                info = p.get_device_info_by_index(i)
+
+                if info.get("maxInputChannels", 0) > 0:
+                    devices.append({
+                        "id": i,
+                        "name": info.get("name", f"Microphone {i}")
+                    })
+        finally:
+            p.terminate()
+
+        return devices
+    
+
+    def getMidiInputDevices(self):
+        devices = []
+
+        try:
+            names = mido.get_input_names()
+            for i, name in enumerate(names):
+                devices.append({
+                    "id": name,      # keep the actual port name
+                    "name": name
+                })
+        except Exception as e:
+            print("Failed to get MIDI devices:", e)
+
+        return devices
