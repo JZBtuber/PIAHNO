@@ -96,6 +96,9 @@ class basicWorker(QObject):
         self.muted = False
         self.isLive = isLive
         self.path = path
+        self.record = False
+        self.isRecording = False
+        self.ID = 0
 
 
     def run(self):
@@ -109,9 +112,11 @@ class basicWorker(QObject):
                 QThread.msleep(50)
                 continue
             self.loop()
+            if self.record or self.isRecording:
+                self.recordSetUp()
+
 
         self.afterLoop()
-
 
 
     def beforeLoop():
@@ -123,20 +128,53 @@ class basicWorker(QObject):
     def afterLoop():
         print("After the loop")
 
+    
+    def recordSetUp(self):
+        if not self.isRecording:
+            self.initRecording()
+            self.isRecording = True
+
+        self.recordloop()
+
+
+        if not self.record:
+            self.stopRecording()
+            self.isRecording = False
+            
+
+    
+    def initRecording(self):
+        print("Initiatiing Recording")
+
+
+    def stopRecording(self):
+        print("Stop recording")
+
+
+    def recordloop(self):
+        print("Recording")
+
+    def setID(self, ID: int = 0):
+        self.ID = ID
+
     @pyqtSlot()
     def pause(self):
         self.paused = not self.paused
-        
+
+
     @pyqtSlot()
     def stop(self):
         self.running = False
+
 
     @pyqtSlot(bool)
     def mute(self, s):
         self.muted = s
 
-    
-        
+
+    @pyqtSlot(bool)
+    def setRecord(self, s):
+        self.record = s
             
     
 class basicWindowWidget(QWidget):
@@ -273,7 +311,8 @@ class basicWindowWidget(QWidget):
 
         #Starts the worker if the thread is started
         self.thread.started.connect(self.worker.run)
-
+        
+        self.worker.setID(self.ID)
         if self.hasAudio and self.muteCheckBox.checkState():
             self.worker.mute(self.muteCheckBox.isChecked())
 
@@ -301,6 +340,10 @@ class basicWindowWidget(QWidget):
 
     def setIsLive(self, s: bool):
         self.isLive = s
+
+    
+    def setRecord(self, s):
+        self.worker.setRecord(s)
 
 
     def stop(self):
@@ -402,6 +445,13 @@ class basicWindowWidget(QWidget):
             p.terminate()
 
         return devices
+    
+    def startRecording(self):
+        self.worker.setRecord(True)
+
+
+    def stopRecording(self):
+        self.worker.setRecord(False)
     
 
     def getMidiInputDevices(self):

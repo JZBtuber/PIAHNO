@@ -67,7 +67,9 @@ class MainWindow(QMainWindow):
                             QAction("Save project", self),
                             QAction("Start", self),
                             QAction("Pause/Resume", self),
-                            QAction("Stop",self)
+                            QAction("Stop",self),
+                            QAction("Start Recording", self),
+                            QAction("Stop Recording", self)
                             ]
         
         self.quickAccess[0].setStatusTip("Add or remove an observation window")
@@ -76,7 +78,8 @@ class MainWindow(QMainWindow):
         self.quickAccess[3].setStatusTip("Start all video/audio")
         self.quickAccess[4].setStatusTip("Pause and resume all video/audio")
         self.quickAccess[5].setStatusTip("Stop all video/audio")
-
+        self.quickAccess[6].setStatusTip("Start recording all windows")
+        self.quickAccess[7].setStatusTip("Stop recording all windows")
 
         self.quickAccess[0].triggered.connect(self.dialog.exec)
         self.quickAccess[1].triggered.connect(self.removeAllWindow)
@@ -84,6 +87,8 @@ class MainWindow(QMainWindow):
         self.quickAccess[3].triggered.connect(self.startALL)
         self.quickAccess[4].triggered.connect(self.pauseALL)
         self.quickAccess[5].triggered.connect(self.stopALL)
+        self.quickAccess[6].triggered.connect(self.startRecordingAll)
+        self.quickAccess[7].triggered.connect(self.stopRecordingALL)
 
         self.toolbar.addActions(self.quickAccess)
 
@@ -178,6 +183,19 @@ class MainWindow(QMainWindow):
                 if not j.widget == None:
                     j.widget.stop()
         
+    
+    def startRecordingAll(self):
+        for i in self.windows:
+            for j in i:
+                if not j.widget == None:
+                    j.widget.setRecord(True)
+
+    def stopRecordingALL(self):
+        for i in self.windows:
+            for j in i:
+                if not j.widget == None:
+                    j.widget.setRecord(False)
+
 
     def contextMenu(self):
         print("")

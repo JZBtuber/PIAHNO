@@ -8,7 +8,9 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
 import time
+import os
 from src.gui.Core import *
+from datetime import datetime
 
 
 class VideoWorker(basicWorker):
@@ -49,6 +51,7 @@ class VideoWorker(basicWorker):
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             result = self.detector.detect(mp_image)
             output = self.draw_landmarks_on_image(rgb_frame, result)
+            self.videoFrame = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
 
         h, w, ch = output.shape
         qimg = QImage(output.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
@@ -81,6 +84,30 @@ class VideoWorker(basicWorker):
     def afterLoop(self):
         self.capture.release()
 
+
+    def initRecording(self):
+        fourcc =cv2.VideoWriter_fourcc(*'mp4v')
+        width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = self.capture.get(cv2.CAP_PROP_FPS)
+
+
+        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
+
+        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
+
+        newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Video_{self.ID}.mp4")
+
+        self.output = cv2.VideoWriter(newPath, fourcc, fps, (width, height))
+
+
+    def recordloop(self):
+        self.output.write(self.videoFrame)
+
+
+    def stopRecording(self):
+        self.output.release()
+        
 
     @pyqtSlot()
     def setAlgorithm(self, value: bool): #Set if we use the mediapipe algorithm

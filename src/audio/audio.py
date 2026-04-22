@@ -1,6 +1,8 @@
 import wave
 import audioop
 import pyaudio
+import os
+from datetime import datetime
 
 from PyQt6.QtCore import pyqtSignal, QThread
 from PyQt6.QtWidgets import QFileDialog
@@ -23,27 +25,34 @@ class AudioWorker(basicWorker):
         self.p = None
         self.stream = None
         self.wf = None
+        self.frames = None
         self.visualPeak = 0.05
         self.peakDecay = 0.995
 
         # file-mode info
-        self.sample_width = 2
+        self.sample_width = None
         self.channels = 1
         self.rate = 44100
 
     def beforeLoop(self):
         self.p = pyaudio.PyAudio()
 
+        
+
         if self.isLive:
             self.wf = None
-            self.sample_width = 2
-            self.channels = 1
-            self.rate = 44100
+
+            deviceInfo = self.p.get_device_info_by_index(self.path)
+            FORMAT = pyaudio.paInt16
+
+            self.sample_width = self.p.get_sample_size(FORMAT)
+            self.channels = deviceInfo.get('maxInputChannels')
+            self.rate = int(deviceInfo.get('defaultSampleRate'))
 
             self.stream = self.p.open(
                 format=pyaudio.paInt16,
-                channels=1,
-                rate=44100,
+                channels=self.channels,
+                rate=self.rate,
                 input=True,
                 input_device_index=int(self.path),
                 frames_per_buffer=self.chunk
@@ -80,19 +89,19 @@ class AudioWorker(basicWorker):
 
         if self.isLive:
             try:
-                data = self.stream.read(self.chunk, exception_on_overflow=False)
+                self.data = self.stream.read(self.chunk, exception_on_overflow=False)
             except Exception:
                 self.running = False
                 return
 
-            if not data:
+            if not self.data:
                 QThread.msleep(5)
                 return
 
             if self.muted:
                 self.levelChanged.emit(0.0)
             else:
-                self.levelChanged.emit(self.compute_level(data, self.sample_width))
+                self.levelChanged.emit(self.compute_level(self.data, self.sample_width))
 
         else:
             data = self.wf.readframes(self.chunk)
@@ -136,6 +145,33 @@ class AudioWorker(basicWorker):
             self.p = None
 
         self.finished.emit()
+
+
+    def initRecording(self):
+        self.frames = []
+
+    
+    def recordloop(self):
+        self.frames.append(self.data)
+
+
+    def stopRecording(self):
+
+        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
+
+
+        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
+
+        newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Audio_{self.ID}.wav")
+
+        wf = wave.open(newPath, 'wb')
+        wf.setnchannels(self.channels)
+        wf.setsampwidth(self.sample_width)
+        wf.setframerate(self.rate)
+        wf.writeframes(b''.join(self.frames))
+        wf.close()
+
+
 
     def compute_level(self, data: bytes, sample_width: int) -> float:
         if not data:
@@ -223,7 +259,7 @@ class AudioFeed(basicWindowWidget):
 
     def connectAll(self):
         self.worker.levelChanged.connect(self.visualizer.pushLevel)
-        self.worker.finished.connect(self.onPlaybackFinished)
+        self.worker.finished.connect(self.worker.stop)
 
     def browseFile(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -234,8 +270,3 @@ class AudioFeed(basicWindowWidget):
         )
         if path:
             self.pathInput.setText(path)
-
-    def onPlaybackFinished(self):
-        self.visualizer.clear()
-        self.worker = None
-        self.thread = None

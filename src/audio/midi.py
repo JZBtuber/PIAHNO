@@ -1,8 +1,10 @@
-from mido import MidiFile
+import mido
+import os
 from PyQt6.QtWidgets import QCheckBox, QWidget, QFileDialog, QHBoxLayout, QVBoxLayout, QListWidgetItem, QLabel, QListWidget, QPushButton, QLineEdit
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QColor
 from src.gui.Core import *
+from datetime import datetime
 import time
 import numpy as np
 import pyaudio
@@ -86,7 +88,7 @@ class MidiWorker(basicWorker):
             self.next_event_time = None
             self.song_time = 0.0
         else:
-            self.midi = MidiFile(self.path, clip=True)
+            self.midi = mido.MidiFile(self.path, clip=True)
             self.events = list(self.midi)
             self.event_index = 0
             self.next_event_time = self.events[0].time if self.events else None
@@ -192,6 +194,31 @@ class MidiWorker(basicWorker):
 
         self.finished.emit()
 
+
+    def initRecording(self):
+        self.midi = mido.MidiFile()
+        self.track = mido.MidiTrack()
+        self.midi.tracks.append(self.thread)
+        self.starTime = time.time()
+
+
+    def recordloop(self):
+        msg = self.inport.receive()
+        if msg is not None:
+            msg.time = time.time() - self.startTime
+            self.track.append(msg)
+
+        
+    def stopRecording(self):
+
+        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
+
+
+        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
+
+        newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Midi_{self.ID}.mid")
+        
+        self.midi.save(newPath)
 
 class MidiFeed(basicWindowWidget):
     def __init__(self, ID: int):
