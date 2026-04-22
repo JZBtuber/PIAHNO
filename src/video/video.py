@@ -11,6 +11,7 @@ import time
 import os
 from src.gui.Core import *
 from datetime import datetime
+from pathlib import Path
 
 
 class VideoWorker(basicWorker):
@@ -25,8 +26,6 @@ class VideoWorker(basicWorker):
         self.useOnlyAlgorithm = False       #Use the Mediapipe algorithm and blackout everything else
         self.target_dt = 1.0 / 60.0         #Target FPS
 
-        self.setMediapipeSettings()
-
 
     def beforeLoop(self):
         path = self.path if not self.isLive else int(self.path)
@@ -35,12 +34,15 @@ class VideoWorker(basicWorker):
         self.target_dt = 1.0 / (self.capture.get(cv2.CAP_PROP_FPS) if not self.capture.get(cv2.CAP_PROP_FPS) == 0 else 60)
         self.prevTime = time.perf_counter()
         self.smoothedFps = 0.0
+        if self.useAlgorithm:
+            self.setMediapipeSettings()
 
     def loop(self):
         loop_start = time.perf_counter()
 
         ret, frame = self.capture.read()
         if not ret:
+            self.running = False
             return
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -120,7 +122,9 @@ class VideoWorker(basicWorker):
 
 
     def setMediapipeSettings(self): #Setting the Mediapipe default settings
-        base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
+        model_path = Path(__file__).resolve().with_name("hand_landmarker.task")
+
+        base_options = python.BaseOptions(model_asset_path=str(model_path))
         options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=4)
         self.detector = vision.HandLandmarker.create_from_options(options)
 
@@ -167,7 +171,7 @@ class VideoWorker(basicWorker):
     
 
 class VideoFeed(basicWindowWidget):
-    def __init__(self, ID: int, cameraNumber = 0):
+    def __init__(self, ID: int):
         
         super().__init__(VideoWorker, ID)
 

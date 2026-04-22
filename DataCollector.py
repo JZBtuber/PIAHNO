@@ -1,5 +1,5 @@
 from src.gui.gui import Application
-
+import os
 #----------------------------------------------------------------#
 # This code was writen by Justin Boileau
 # for the PIAHNO reseach project at the "Université de Montreal".
@@ -7,4 +7,6 @@ from src.gui.gui import Application
 # This is the main .py file of the app.
 #----------------------------------------------------------------#
 
-app = Application()
+localPath = os.path.dirname(os.path.realpath(__file__))
+
+app = Application(localPath)

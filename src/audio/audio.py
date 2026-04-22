@@ -46,7 +46,6 @@ class AudioWorker(basicWorker):
             FORMAT = pyaudio.paInt16
 
             self.sample_width = self.p.get_sample_size(FORMAT)
-            self.channels = deviceInfo.get('maxInputChannels')
             self.rate = int(deviceInfo.get('defaultSampleRate'))
 
             self.stream = self.p.open(
@@ -71,7 +70,6 @@ class AudioWorker(basicWorker):
                 return
 
             self.sample_width = self.wf.getsampwidth()
-            self.channels = self.wf.getnchannels()
             self.rate = self.wf.getframerate()
 
             self.stream = self.p.open(

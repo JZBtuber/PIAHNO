@@ -26,7 +26,7 @@ class WidgetData():
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, workingPath: str):
         super().__init__()
 
         #Sets the window's defaults
@@ -91,6 +91,11 @@ class MainWindow(QMainWindow):
         self.quickAccess[7].triggered.connect(self.stopRecordingALL)
 
         self.toolbar.addActions(self.quickAccess)
+
+        for i, action in enumerate(self.quickAccess):
+            if i == 3 or i == 6:
+                self.toolbar.addSeparator
+            self.toolbar.addAction(action)
 
 
     def addMenuBar(self):
