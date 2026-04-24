@@ -35,9 +35,7 @@ class AudioWorker(basicWorker):
 
     def beforeLoop(self):
         self.p = pyaudio.PyAudio()
-
         
-
         if self.isLive:
             self.wf = None
 
@@ -144,6 +142,10 @@ class AudioWorker(basicWorker):
 
     def initRecording(self):
         self.frames = []
+        
+        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
+        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
+        self.newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Audio_{self.ID}.wav")
 
     
     def recordloop(self):
@@ -152,14 +154,7 @@ class AudioWorker(basicWorker):
 
     def stopRecording(self):
 
-        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
-
-
-        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
-
-        newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Audio_{self.ID}.wav")
-
-        wf = wave.open(newPath, 'wb')
+        wf = wave.open(self.newPath, 'wb')
         wf.setnchannels(self.channels)
         wf.setsampwidth(self.sample_width)
         wf.setframerate(self.rate)

@@ -176,6 +176,7 @@ class VideoLoader(QDialog):
         #Sets the thread garbage collection settings
         self.thread.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.finished.connect(self.onThreadFinished)
 
         #Start the thread and so, the worker
         self.thread.start()
@@ -218,7 +219,7 @@ class VideoLoader(QDialog):
 
     @pyqtSlot(int)
     def getLoadingLayout(self, frameCount):
-        print("Made progress bar")
+
         self.loadingBar = QProgressBar()
 
         self.loadingBar.setRange(0, frameCount)
@@ -267,4 +268,10 @@ class VideoLoader(QDialog):
         )
         if path:
             self.pathInput.setText(path)
+
+
+    def onThreadFinished(self):
+        self.worker = None
+        self.thread = None
+
 

@@ -140,6 +140,11 @@ class MidiWorker(basicWorker):
 
 
     def initRecording(self):
+
+        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
+        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
+        self.newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Midi_{self.ID}.mid")
+        
         self.midi_recording = mido.MidiFile(ticks_per_beat=480)
         self.track = mido.MidiTrack()
         self.midi_recording.tracks.append(self.track)
@@ -169,14 +174,7 @@ class MidiWorker(basicWorker):
 
         
     def stopRecording(self):
-
-        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
-
-        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
-
-        newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Midi_{self.ID}.mid")
-        
-        self.midi_recording.save(newPath)
+        self.midi_recording.save(self.newPath)
 
 class MidiFeed(basicWindowWidget):
     def __init__(self, ID: int):

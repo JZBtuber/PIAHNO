@@ -1,9 +1,9 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
 from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtMultimedia import QMediaDevices
 import pyaudio
 import cv2
 import mido
+import os
 
 
 class FileDropLineEdit(QLineEdit):
@@ -195,6 +195,9 @@ class basicWindowWidget(QWidget):
         super().__init__()
 
         #Setting the default variables
+
+        self.windows = []
+
         self.ID = ID
         self.filePath: str = ""
         self.livePath: str = ""
@@ -209,6 +212,44 @@ class basicWindowWidget(QWidget):
         self.isLive = False
         self.devices = []
         self.isLiveFeed = True
+        self.syncParentName: str = ""
+        self.fileName: str = ""
+        self.syncDelay: float = 0.0
+
+    
+    @pyqtSlot(QWidget)
+    def addWidget(self, widget: QWidget):
+        self.windows.append(widget)
+        self.parentComboBox.clear()
+
+        for w in self.windows:
+            if isinstance(w, basicWindowWidget) and (w.ID != self.ID) and (w.fileName != ""):
+                self.parentComboBox.addItem(w.fileName)
+
+        print(self.windows)
+
+
+    def reloadParents(self):
+        self.parentComboBox.clear()
+
+        self.windows = []
+
+        for i in range(1, 9):
+            window = self.window()
+            if hasattr(window, "getWidgetByID"):
+                self.windows.append(window.getWidgetByID(i))
+            else:
+                return
+
+        for w in self.windows:
+            if isinstance(w, basicWindowWidget) and (w.ID != self.ID) and (w.fileName != ""):
+                self.parentComboBox.addItem(w.fileName)
+                print(w.fileName)
+        
+
+    def setSyncParentName(self, name: str):
+        self.syncParentName = name
+        self.syncParentNameLabel.setText(f"ParentName: {self.syncParentName}")
 
         
     def setControlLayout(self, layout):
@@ -222,7 +263,28 @@ class basicWindowWidget(QWidget):
     def makeBasicWidget(self):
 
         #ID number
-        IDLabel = QLabel(str(self.ID))
+        IDLabel = QLabel(f"ID: {self.ID}")
+
+        #SyncParent
+        self.parentComboBox = QComboBox()
+        self.parentComboBox.setPlaceholderText("Sync Parent")
+        self.parentComboBox.currentTextChanged.connect(self.setSyncParentName)
+        
+        reloadParentsButton = QPushButton("Reload")
+
+        reloadParentsButton.clicked.connect(self.reloadParents)
+
+        self.syncParentNameLabel = QLabel(f"ParentName: {self.syncParentName}")
+
+        #Top layout
+        topLayout = QHBoxLayout()
+
+        topLayout.addWidget(IDLabel)
+        topLayout.addWidget(self.parentComboBox)
+        topLayout.addWidget(reloadParentsButton)
+        topLayout.addWidget(self.syncParentNameLabel)
+        topLayout.addStretch()
+
 
         #Control buttons
         self.startButton = QPushButton("Start")
@@ -289,7 +351,7 @@ class basicWindowWidget(QWidget):
         windowLayout = QVBoxLayout()
 
         windowLayout.addStretch()
-        windowLayout.addWidget(IDLabel, 0)
+        windowLayout.addLayout(topLayout, 0)
         if self.mainWidget is not None:
             windowLayout.addWidget(self.mainWidget, 1)
         windowLayout.addLayout(controlsLayout, 0)
@@ -347,6 +409,9 @@ class basicWindowWidget(QWidget):
 
     def updateFilePath(self):
         self.filePath = self.pathInput.text()
+        print("Updating file name")
+        self.fileName = os.path.basename(self.filePath)
+        print(self.fileName)
 
 
     def setIsLive(self, s: bool):
@@ -385,6 +450,14 @@ class basicWindowWidget(QWidget):
             self.path = self.livePath
         else:
             self.path = self.filePath
+
+
+    def getDelay(self):
+        return self.syncDelay
+
+
+    def setDelay(self, delay: float = 0.0):
+        self.syncDelay = delay
 
 
     def browseFile(self):

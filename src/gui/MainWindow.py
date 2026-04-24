@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QAction, QIcon, QPixmap
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from src.video.video import VideoFeed
 from src.audio.midi import MidiFeed
 from src.audio.audio import AudioFeed
@@ -25,6 +25,7 @@ class WidgetData():
 
 
 class MainWindow(QMainWindow):
+    windowAdded = pyqtSignal(QWidget)
 
     def __init__(self, workingPath: str):
         super().__init__()
@@ -46,7 +47,6 @@ class MainWindow(QMainWindow):
         self.fondLayout.setSpacing(10)
         self.fond.setLayout(self.fondLayout)
         self.dialog = WindowChoice(self)
-        self.videoTool = VideoLoader()
 
         self.addTopMenu()
         self.addMenuBar()
@@ -115,7 +115,7 @@ class MainWindow(QMainWindow):
         
         self.toolOptions2 = [QAction("Preload Video", self),
                              QAction("Export Key Frames",self)]
-        self.toolOptions2[0].triggered.connect(self.videoTool.exec)
+        self.toolOptions2[0].triggered.connect(self.preload)
 
         self.menu = self.menuBar()
         self.fileMenu = self.menu.addMenu("&Files")
@@ -140,6 +140,8 @@ class MainWindow(QMainWindow):
                     jData.widget = widget
                     jData.setID(int(i * 4 + j + 1))
                     self.fondLayout.addWidget(widget, int(i), int(j))
+                    self.windowAdded.connect(jData.widget.addWidget)
+                    self.windowAdded.emit(jData.widget)
                     return
 
     
@@ -205,6 +207,21 @@ class MainWindow(QMainWindow):
     def contextMenu(self):
         print("")
         #make context menu here
+
+
+    def preload(self):
+        loader = VideoLoader()
+        loader.exec()
+        loader = None
+
+
+    def getWidgetByID(self, ID: int = 0) -> QWidget:
+        for i in self.windows:
+            for j in i:
+                if j.ID == ID and j.widget is not None:
+                    return j.widget
+        return None
+
 
 
 class topMenu(QToolBar):
@@ -277,6 +294,8 @@ class WindowChoice(QDialog):
     def removeWindow(self):
         self.mainWindow.removeWindow(self.removeWindowSpinBox.value())
         self.close()
+
+    
 
 
 
