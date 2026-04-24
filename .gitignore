@@ -212,3 +212,5 @@ __marimo__/
 src/gui/__pycache__/MainWindow.cpython-313.pyc
 src/gui/__pycache__/MainWindow.cpython-313.pyc
 .vscode/settings.json
+
+Tests/

@@ -15,7 +15,6 @@ from PyQt6.QtWidgets import QSizePolicy
 
 
 class AudioWorker(basicWorker):
-    finished = pyqtSignal()
     levelChanged = pyqtSignal(float)
 
     def __init__(self, path, isLive, chunk: int = 1024):
@@ -142,8 +141,6 @@ class AudioWorker(basicWorker):
                 pass
             self.p = None
 
-        self.finished.emit()
-
 
     def initRecording(self):
         self.frames = []
@@ -257,7 +254,6 @@ class AudioFeed(basicWindowWidget):
 
     def connectAll(self):
         self.worker.levelChanged.connect(self.visualizer.pushLevel)
-        self.worker.finished.connect(self.worker.stop)
 
     def browseFile(self):
         path, _ = QFileDialog.getOpenFileName(

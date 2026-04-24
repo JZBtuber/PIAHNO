@@ -7,6 +7,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+from pathlib import Path
 
 class VideoWorker(QObject):
     frameCount = pyqtSignal(int)
@@ -19,6 +20,7 @@ class VideoWorker(QObject):
         self.path: str                  #Path to the video to write the algorithm on
         self.useOnlyAlgorithm = False   #Use only the algorithm with a black background
         self.running = False
+        self.frameNumber = 0
 
         self.setMediapipeSettings()
 
@@ -121,7 +123,9 @@ class VideoWorker(QObject):
 
 
     def setMediapipeSettings(self): #Setting the Mediapipe default settings
-        base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
+        model_path = Path(__file__).resolve().with_name("hand_landmarker.task")
+
+        base_options = python.BaseOptions(model_asset_path=str(model_path))
         options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=4)
         self.detector = vision.HandLandmarker.create_from_options(options)
 
@@ -259,7 +263,7 @@ class VideoLoader(QDialog):
             self,
             "Select audio file",
             "",
-            "MOV Files (*.MOV);;All Files (*)"
+            "MOV Files (*.MOV);;Mp4 Files (*.mp4);;All Files (*)"
         )
         if path:
             self.pathInput.setText(path)

@@ -104,28 +104,39 @@ class basicWorker(QObject):
     def run(self):
         self.running = True
 
-        self.beforeLoop()
+        try:
+            self.beforeLoop()
 
-        while self.running :
+            while self.running :
 
-            if self.paused:
-                QThread.msleep(50)
-                continue
-            self.loop()
-            if self.record or self.isRecording:
-                self.recordSetUp()
+                if self.paused:
+                    QThread.msleep(50)
+                    continue
+                self.loop()
+                if self.record or self.isRecording:
+                    self.recordSetUp()
+
+        except Exception as e:
+            print(f"{type(self).__name__} crashed: {e}")
+
+        finally:
+            try:
+                self.afterLoop()
+                
+            except Exception as e:
+                print(f"{type(self).__name__} crashed: {e}")
+            finally:
+                self.finished.emit()
 
 
-        self.afterLoop()
 
-
-    def beforeLoop():
+    def beforeLoop(self):
         print("Before the loop")
     
-    def loop():
+    def loop(self):
         print("Looping")
 
-    def afterLoop():
+    def afterLoop(self):
         print("After the loop")
 
     
@@ -159,22 +170,22 @@ class basicWorker(QObject):
 
     @pyqtSlot()
     def pause(self):
-        self.paused = not self.paused
+            self.paused = not self.paused
 
 
     @pyqtSlot()
     def stop(self):
-        self.running = False
+            self.running = False
 
 
     @pyqtSlot(bool)
     def mute(self, s):
-        self.muted = s
+            self.muted = s
 
 
     @pyqtSlot(bool)
     def setRecord(self, s):
-        self.record = s
+            self.record = s
             
     
 class basicWindowWidget(QWidget):
@@ -311,12 +322,11 @@ class basicWindowWidget(QWidget):
 
         #Starts the worker if the thread is started
         self.thread.started.connect(self.worker.run)
-        
+        self.worker.finished.connect(self.onWorkerFinished)
+
         self.worker.setID(self.ID)
         if self.hasAudio and self.muteCheckBox.checkState():
             self.worker.mute(self.muteCheckBox.isChecked())
-
-        self.worker.finished.connect(self.worker.stop)
 
         #Connections of specific windows
         self.connectAll()
@@ -324,6 +334,7 @@ class basicWindowWidget(QWidget):
         #Sets the thread garbage collection settings
         self.thread.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.finished.connect(self.onThreadFinished)
 
         #Start the thread and so, the worker
         self.thread.start()
@@ -349,14 +360,16 @@ class basicWindowWidget(QWidget):
     def stop(self):
         self.startButton.setChecked(False)
         self.pauseButton.setChecked(False)
-        if self.worker is not None:
-            self.worker.stop()      #Stop the worker
-        if self.thread is not None:
-            self.thread.quit()      #Stop the thread
-            self.thread.wait()
 
-            self.worker = None      #Deletes them both
-            self.thread = None
+        if self.worker is not None:
+            try:
+                self.worker.stop()
+            except Exception:
+                pass
+
+        if self.thread is not None:
+            self.thread.quit()
+            self.thread.wait()
 
     def mute(self, s):
         if self.worker is not None:
@@ -396,8 +409,14 @@ class basicWindowWidget(QWidget):
         print("Make all connections")
 
 
-    def reloadDevices(self,):
+    def reloadDevices(self):
         self.getDevices(self.inputType)
+
+        self.deviceComboBox.clear()
+
+        for device in self.devices:
+            self.deviceComboBox.addItem(device["name"], device["id"])
+
 
 
     def getDevices(self, backend: str):
@@ -468,3 +487,13 @@ class basicWindowWidget(QWidget):
             print("Failed to get MIDI devices:", e)
 
         return devices
+    
+
+    def onWorkerFinished(self):
+        self.startButton.setChecked(False)
+        self.pauseButton.setChecked(False)
+
+
+    def onThreadFinished(self):
+        self.worker = None
+        self.thread = None

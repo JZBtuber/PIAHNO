@@ -29,7 +29,6 @@ class VideoWorker(basicWorker):
 
     def beforeLoop(self):
         path = self.path if not self.isLive else int(self.path)
-        print("Path")
         self.capture = cv2.VideoCapture(path)
         self.target_dt = 1.0 / (self.capture.get(cv2.CAP_PROP_FPS) if not self.capture.get(cv2.CAP_PROP_FPS) == 0 else 60)
         self.prevTime = time.perf_counter()
@@ -53,7 +52,8 @@ class VideoWorker(basicWorker):
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             result = self.detector.detect(mp_image)
             output = self.draw_landmarks_on_image(rgb_frame, result)
-            self.videoFrame = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+        
+        self.videoFrame = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
 
         h, w, ch = output.shape
         qimg = QImage(output.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()

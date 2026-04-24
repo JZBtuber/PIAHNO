@@ -7,7 +7,7 @@ from src.gui.Core import *
 from datetime import datetime
 import time
 import numpy as np
-import pyaudio
+
 
 
 class MidiWorker(basicWorker):
@@ -17,12 +17,7 @@ class MidiWorker(basicWorker):
     def __init__(self, path, isLive, sample_rate: int = 44100, chunk: int = 512):
         super().__init__(path, isLive)
 
-        self.sample_rate = sample_rate
-        self.chunk = chunk
-        self.p = None
-        self.stream = None
         self.active_notes = {}
-        self._phase = {}
 
         self.midi = None
         self.events = []
@@ -37,48 +32,36 @@ class MidiWorker(basicWorker):
 
 
     def make_chunk(self, frames: int) -> bytes:
-        if self.muted or not self.active_notes:
-            #If the worker is muted, the sample is empty
-            samples = np.zeros(frames, dtype=np.float32)    
 
-        else:
-            t = np.arange(frames, dtype=np.float32) / self.sample_rate  #Numpy array for the audio
-            samples = np.zeros(frames, dtype=np.float32)                #Numpy array of the samples  
+        t = np.arange(frames, dtype=np.float32) / self.sample_rate  #Numpy array for the audio
+        samples = np.zeros(frames, dtype=np.float32)                #Numpy array of the samples  
 
-            for note, velocity in list(self.active_notes.items()):      #Loop for each active note, plays the audio
-                freq = self.midi_note_freq(note)    #Gets the frequency
-                phase = self._phase.get(note, 0.0)  #Gets the phase of the note
+        for note, velocity in list(self.active_notes.items()):      #Loop for each active note, plays the audio
+            freq = self.midi_note_freq(note)    #Gets the frequency
+            phase = self._phase.get(note, 0.0)  #Gets the phase of the note
 
-                #Simple sine wave
-                wave = np.sin((2.0 * np.pi * freq * t) + phase)
+            #Simple sine wave
+            wave = np.sin((2.0 * np.pi * freq * t) + phase)
 
-                #Scaled by velocity
-                amp = (velocity / 127.0) * 0.15
-                samples += wave * amp
+               #Scaled by velocity
+            amp = (velocity / 127.0) * 0.15
+            samples += wave * amp
 
-                #Store phase's continuity
-                phase_advance = 2.0 * np.pi * freq * frames / self.sample_rate
-                self._phase[note] = (phase + phase_advance) % (2.0 * np.pi)
+            #Store phase's continuity
+            phase_advance = 2.0 * np.pi * freq * frames / self.sample_rate
+            self._phase[note] = (phase + phase_advance) % (2.0 * np.pi)
 
-            #Prevent clipping by cutting samples too big
-            samples = np.clip(samples, -1.0, 1.0)
+        #Prevent clipping by cutting samples too big
+        samples = np.clip(samples, -1.0, 1.0)
 
         #Convert float32 mono PCM
         return samples.astype(np.float32).tobytes()
 
 
     def beforeLoop(self):
-        self.p = pyaudio.PyAudio()
-        self.stream = self.p.open(
-            format=pyaudio.paFloat32,
-            channels=1,
-            rate=self.sample_rate,
-            output=True,
-            frames_per_buffer=self.chunk
-        )
-
+        self.msg = None
+        self.record_msg = None
         self.active_notes.clear()
-        self._phase.clear()
 
         if self.isLive:
             self.inport = mido.open_input(self.path)
@@ -105,65 +88,45 @@ class MidiWorker(basicWorker):
 
 
     def loop_live(self):
-        # read all pending midi messages
-        for msg in self.inport.iter_pending():
-            if msg.type == "note_on" and msg.velocity > 0:
-                self.active_notes[msg.note] = msg.velocity
-                self.noteOn.emit(msg.note, msg.velocity)
+        had_message = False
 
-            elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
-                self.active_notes.pop(msg.note, None)
-                self._phase.pop(msg.note, None)
-                self.noteOff.emit(msg.note)
+        for self.msg in self.inport.iter_pending():
+            had_message = True
+            self.record_msg = self.msg
 
-        # continuously synthesize currently held notes
-        audio = self.make_chunk(self.chunk)
-        self.stream.write(audio)
+            if self.msg.type == "note_on" and self.msg.velocity > 0:
+                self.active_notes[self.msg.note] = self.msg.velocity
+                self.noteOn.emit(self.msg.note, self.msg.velocity)
 
-        QThread.msleep(int(1000 * self.chunk / self.sample_rate))
+            elif self.msg.type == "note_off" or (self.msg.type == "note_on" and self.msg.velocity == 0):
+                self.active_notes.pop(self.msg.note, None)
+                self.noteOff.emit(self.msg.note)
+
+        if not had_message:
+            QThread.msleep(5)
 
 
     def loop_file(self):
-        audio = self.make_chunk(self.chunk)
-        self.stream.write(audio)
-
-        chunk_duration = self.chunk / self.sample_rate
-        elapsed_in_chunk = 0.0
-
-        while (
-            self.event_index < len(self.events)
-            and self.next_event_time is not None
-            and self.next_event_time <= chunk_duration - elapsed_in_chunk + 1e-9
-        ):
-            msg = self.events[self.event_index]
-
-            if msg.type == "note_on" and msg.velocity > 0:
-                self.active_notes[msg.note] = msg.velocity
-                self.noteOn.emit(msg.note, msg.velocity)
-
-            elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
-                self.active_notes.pop(msg.note, None)
-                self._phase.pop(msg.note, None)
-                self.noteOff.emit(msg.note)
-
-            elapsed_in_chunk += msg.time
-            self.event_index += 1
-
-            if self.event_index < len(self.events):
-                self.next_event_time = self.events[self.event_index].time
-            else:
-                self.next_event_time = None
-                break
-
-        self.song_time += chunk_duration
-
-        if self.next_event_time is not None:
-            self.next_event_time -= chunk_duration
-            if self.next_event_time < 0:
-                self.next_event_time = 0.0
-
-        if self.event_index >= len(self.events) and not self.active_notes:
+        if self.event_index >= len(self.events):
             self.running = False
+            return
+
+        msg = self.events[self.event_index]
+
+        if msg.time > 0:
+            QThread.msleep(int(msg.time * 1000))
+
+        self.msg = msg
+
+        if msg.type == "note_on" and msg.velocity > 0:
+            self.active_notes[msg.note] = msg.velocity
+            self.noteOn.emit(msg.note, msg.velocity)
+
+        elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
+            self.active_notes.pop(msg.note, None)
+            self.noteOff.emit(msg.note)
+
+        self.event_index += 1
 
 
     def afterLoop(self):
@@ -174,61 +137,66 @@ class MidiWorker(basicWorker):
                 pass
             self.inport = None
 
-        if self.stream is not None:
-            try:
-                self.stream.stop_stream()
-            except Exception:
-                pass
-            try:
-                self.stream.close()
-            except Exception:
-                pass
-            self.stream = None
-
-        if self.p is not None:
-            try:
-                self.p.terminate()
-            except Exception:
-                pass
-            self.p = None
-
-        self.finished.emit()
 
 
     def initRecording(self):
-        self.midi = mido.MidiFile()
+        self.midi_recording = mido.MidiFile(ticks_per_beat=480)
         self.track = mido.MidiTrack()
-        self.midi.tracks.append(self.thread)
-        self.starTime = time.time()
+        self.midi_recording.tracks.append(self.track)
+
+        self.tempo = mido.bpm2tempo(120)   # 120 BPM default
+        self.track.append(mido.MetaMessage('set_tempo', tempo=self.tempo, time=0))
+
+        self.last_record_time = time.time()
 
 
     def recordloop(self):
-        msg = self.inport.receive()
-        if msg is not None:
-            msg.time = time.time() - self.startTime
-            self.track.append(msg)
+        if self.record_msg is not None:
+            now = time.time()
+            delta_seconds = now - self.last_record_time
+            self.last_record_time = now
+
+            delta_ticks = int(
+                mido.second2tick(
+                    delta_seconds,
+                    self.midi_recording.ticks_per_beat,
+                    self.tempo
+                )
+            )
+
+            self.track.append(self.record_msg.copy(time=delta_ticks))
+            self.record_msg = None
 
         
     def stopRecording(self):
 
         time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
 
-
         os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
 
         newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Midi_{self.ID}.mid")
         
-        self.midi.save(newPath)
+        self.midi_recording.save(newPath)
 
 class MidiFeed(basicWindowWidget):
     def __init__(self, ID: int):
-        super().__init__(MidiWorker, ID, True)
+        super().__init__(MidiWorker, ID, False)
 
         self.activeNoteItems = {}
         self.mainWidget = QListWidget()
         self.inputType = "midi"
 
+        self.clearNotesButton = QPushButton("Clear Notes")
+        self.clearNotesButton.clicked.connect(self.clearNotes)
+
+        self.controlLayout = QVBoxLayout()
+        self.controlLayout.addWidget(self.clearNotesButton)
+
         self.makeBasicWidget()
+
+    def clearNotes(self):
+        self.activeNoteItems.clear()
+        self.mainWidget.clear()
 
 
     def midiNoteToName(self, note: int) -> str: #Gives a name to the note in int
