@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
         self.windowNumber = 0
         self.windows = [[WidgetData() for _ in range(4)] for _ in range(2)]
         self.clock = None
+        self.localPath = workingPath
 
     def addBaseWidget(self):
         self.fond = QWidget()
@@ -138,7 +139,7 @@ class MainWindow(QMainWindow):
         for i, iData in enumerate(self.windows):
             for j, jData in enumerate(iData):
                 if jData.widget is None:
-                    widget = widgetClass(int((i * 4 + j + 1))) if isinstance(widgetClass, type) else widgetClass
+                    widget = widgetClass(int((i * 4 + j + 1)), self.localPath) if isinstance(widgetClass, type) else widgetClass
                     jData.widget = widget
                     jData.setID(int(i * 4 + j + 1))
                     self.fondLayout.addWidget(widget, int(i), int(j))

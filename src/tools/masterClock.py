@@ -29,7 +29,7 @@ class MasterClock(QObject):
 
 
     def releaseAll(self):
-        delays_ms = [int(widget.syncDelay * 1000) for widget in self.sortedWidgets]
+        delays_ms = [int(widget.syncDelay) for widget in self.sortedWidgets]
         min_delay = min(delays_ms)
 
         for widget, delay_ms in zip(self.sortedWidgets, delays_ms):

@@ -177,8 +177,8 @@ class MidiWorker(basicWorker):
         self.midi_recording.save(self.newPath)
 
 class MidiFeed(basicWindowWidget):
-    def __init__(self, ID: int):
-        super().__init__(MidiWorker, ID, False)
+    def __init__(self, ID: int, workingDir:str = ""):
+        super().__init__(MidiWorker, ID, False, workingDir=workingDir)
 
         self.activeNoteItems = {}
         self.mainWidget = QListWidget()

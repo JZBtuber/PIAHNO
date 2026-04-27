@@ -171,9 +171,9 @@ class VideoWorker(basicWorker):
     
 
 class VideoFeed(basicWindowWidget):
-    def __init__(self, ID: int):
+    def __init__(self, ID: int, workingDir:str = ""):
         
-        super().__init__(VideoWorker, ID)
+        super().__init__(VideoWorker, ID, workingDir=workingDir)
 
         #Set the default values of variables
         self.useAlgorithm = False

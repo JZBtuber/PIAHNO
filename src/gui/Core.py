@@ -1,5 +1,6 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
 from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from src.tools.fileIO import *
 import pyaudio
 import cv2
 import mido
@@ -118,7 +119,7 @@ class basicWorker(QObject):
                 QThread.msleep(1)
 
             if self.delay > 0:
-                QThread.msleep(int(self.delay))
+                QThread.msleep(self.delay)
 
             while self.running:
                 if self.paused:
@@ -211,7 +212,7 @@ class basicWorker(QObject):
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)
 
-    def __init__(self, workerClass, ID: int = 0, hasAudio = False):
+    def __init__(self, workerClass, ID: int = 0, hasAudio = False, workingDir: str = ""):
         super().__init__()
 
         #Setting the default variables
@@ -222,6 +223,7 @@ class basicWindowWidget(QWidget):
         self.filePath: str = ""
         self.livePath: str = ""
         self.path: str = ""
+        self.workingDir: str = workingDir
         self.mainWidget = None
         self.controlLayout = None
         self.hasAudio = hasAudio
@@ -267,6 +269,10 @@ class basicWindowWidget(QWidget):
     def setSyncParentName(self, name: str):
         self.syncParentName = name
         self.syncParentNameLabel.setText(f"Parent name: {self.syncParentName}")
+        self.syncDelay = getDelayFromParent(self.pathInput.text(),
+                                            f"{os.path.dirname(self.pathInput.text())}/{self.syncParentName}",
+                                            self.workingDir)
+        self.syncDelayLabel.setText(f"Sync delay: {self.syncDelay}")
 
         
     def setControlLayout(self, layout):

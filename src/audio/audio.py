@@ -233,8 +233,8 @@ class AudioVisualizer(QWidget):
 
 
 class AudioFeed(basicWindowWidget):
-    def __init__(self, ID: int):
-        super().__init__(AudioWorker, ID, True)
+    def __init__(self, ID: int, workingDir:str = ""):
+        super().__init__(AudioWorker, ID, True, workingDir=workingDir)
 
         self.visualizer = AudioVisualizer()
         self.mainWidget = self.visualizer
