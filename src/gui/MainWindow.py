@@ -1,10 +1,11 @@
 from PyQt6.QtWidgets import *
-from PyQt6.QtGui import QAction, QIcon, QPixmap
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from src.video.video import VideoFeed
 from src.audio.midi import MidiFeed
 from src.audio.audio import AudioFeed
 from src.tools.VideoLoader import VideoLoader
+from src.tools.masterClock import MasterClock
 
 class WidgetData():
     def __init__(self, widget: QWidget = None, ID: int = 0):
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
         self.addBaseWidget()
         self.windowNumber = 0
         self.windows = [[WidgetData() for _ in range(4)] for _ in range(2)]
+        self.clock = None
 
     def addBaseWidget(self):
         self.fond = QWidget()
@@ -68,8 +70,7 @@ class MainWindow(QMainWindow):
                             QAction("Start", self),
                             QAction("Pause/Resume", self),
                             QAction("Stop",self),
-                            QAction("Start Recording", self),
-                            QAction("Stop Recording", self)
+                            QAction("Record", self)
                             ]
         
         self.quickAccess[0].setStatusTip("Add or remove an observation window")
@@ -78,8 +79,7 @@ class MainWindow(QMainWindow):
         self.quickAccess[3].setStatusTip("Start all video/audio")
         self.quickAccess[4].setStatusTip("Pause and resume all video/audio")
         self.quickAccess[5].setStatusTip("Stop all video/audio")
-        self.quickAccess[6].setStatusTip("Start recording all windows")
-        self.quickAccess[7].setStatusTip("Stop recording all windows")
+        self.quickAccess[6].setStatusTip("Recording all windows")
 
         self.quickAccess[0].triggered.connect(self.dialog.exec)
         self.quickAccess[1].triggered.connect(self.removeAllWindow)
@@ -87,14 +87,16 @@ class MainWindow(QMainWindow):
         self.quickAccess[3].triggered.connect(self.startALL)
         self.quickAccess[4].triggered.connect(self.pauseALL)
         self.quickAccess[5].triggered.connect(self.stopALL)
-        self.quickAccess[6].triggered.connect(self.startRecordingAll)
-        self.quickAccess[7].triggered.connect(self.stopRecordingALL)
+        self.quickAccess[6].triggered.connect(self.chooseRecording)
+
+        self.quickAccess[6].setCheckable(True)
+
 
         self.toolbar.addActions(self.quickAccess)
 
         for i, action in enumerate(self.quickAccess):
             if i == 3 or i == 6:
-                self.toolbar.addSeparator
+                self.toolbar.addSeparator()
             self.toolbar.addAction(action)
 
 
@@ -161,22 +163,18 @@ class MainWindow(QMainWindow):
                 
 
     def removeAllWindow(self):
-        for row in self.windows:
-            for window in row:
-                widget = window.getWidget()
-                if not widget == None:
-                    widget.stop()
-                    self.fondLayout.removeWidget(widget)
-                    widget.setParent = None
-                    window.setID(0)
-                    window.widget = None
+        for i in range(1, 9):
+            self.removeWindow(i)
                     
 
     def startALL(self):
-        for i in self.windows:
-            for j in i:
-                if not j.widget == None:
-                    j.widget.start()
+        self.clock = MasterClock(self.windows)
+
+        for row in self.windows:
+            for widgetData in row:
+                if widgetData.widget is not None:
+                    widgetData.widget.start(masterClock=self.clock, delayed=True)
+        
             
     def pauseALL(self):
         for i in self.windows:
@@ -185,11 +183,18 @@ class MainWindow(QMainWindow):
                     j.widget.pause()
     
     def stopALL(self):
+        self.clock = None
         for i in self.windows:
             for j in i:
                 if not j.widget == None:
                     j.widget.stop()
         
+
+    def chooseRecording(self, s):
+        if s:
+            self.startRecordingAll()
+        else:
+            self.stopRecordingALL()
     
     def startRecordingAll(self):
         for i in self.windows:
@@ -269,8 +274,9 @@ class WindowChoice(QDialog):
         hor0.addWidget(self.removeWindowSpinBox)
 
         hor1.addWidget(addWindowButtonVideo)
-        hor1.addWidget(addWindowButtonMidi)
         hor1.addWidget(addWindowButtonAudio)
+        hor1.addWidget(addWindowButtonMidi)
+        
 
         vert.addLayout(hor0)
         vert.addLayout(hor1)

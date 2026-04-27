@@ -8,7 +8,6 @@ import os
 
 class FileDropLineEdit(QLineEdit):
     fileDropped = pyqtSignal(str)   #Signal emitted when a file is dropped
-
     def __init__(self):
         super().__init__()
 
@@ -87,7 +86,9 @@ class MessageBox(QMessageBox):
 
 class basicWorker(QObject):
     finished = pyqtSignal()
-    def __init__(self, path, isLive):
+    ready = pyqtSignal(int)
+
+    def __init__(self, path, isLive, delay = 0):
         super().__init__()
 
         #Defining default variables
@@ -99,20 +100,33 @@ class basicWorker(QObject):
         self.record = False
         self.isRecording = False
         self.ID = 0
+        self.delay = delay
+        self.delayed = False
+        self.released = False
 
 
     def run(self):
         self.running = True
-
         try:
             self.beforeLoop()
+            self.ready.emit(self.ID)
 
-            while self.running :
+            while self.running and self.delayed:
+                if self.masterClock is not None and self.ID in self.masterClock.released_ids:
+                    self.delay = self.masterClock.released_ids[self.ID]
+                    break
+                QThread.msleep(1)
 
+            if self.delay > 0:
+                QThread.msleep(int(self.delay))
+
+            while self.running:
                 if self.paused:
                     QThread.msleep(50)
                     continue
+
                 self.loop()
+
                 if self.record or self.isRecording:
                     self.recordSetUp()
 
@@ -122,7 +136,6 @@ class basicWorker(QObject):
         finally:
             try:
                 self.afterLoop()
-                
             except Exception as e:
                 print(f"{type(self).__name__} crashed: {e}")
             finally:
@@ -186,7 +199,14 @@ class basicWorker(QObject):
     @pyqtSlot(bool)
     def setRecord(self, s):
             self.record = s
-            
+
+
+    def setDelayed(self, s):
+        self.delayed = s
+
+
+    def setMasterClock(self, clock):
+        self.masterClock = clock
     
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)
@@ -214,7 +234,7 @@ class basicWindowWidget(QWidget):
         self.isLiveFeed = True
         self.syncParentName: str = ""
         self.fileName: str = ""
-        self.syncDelay: float = 0.0
+        self.syncDelay: int = 0
 
     
     @pyqtSlot(QWidget)
@@ -225,8 +245,6 @@ class basicWindowWidget(QWidget):
         for w in self.windows:
             if isinstance(w, basicWindowWidget) and (w.ID != self.ID) and (w.fileName != ""):
                 self.parentComboBox.addItem(w.fileName)
-
-        print(self.windows)
 
 
     def reloadParents(self):
@@ -244,12 +262,11 @@ class basicWindowWidget(QWidget):
         for w in self.windows:
             if isinstance(w, basicWindowWidget) and (w.ID != self.ID) and (w.fileName != ""):
                 self.parentComboBox.addItem(w.fileName)
-                print(w.fileName)
         
 
     def setSyncParentName(self, name: str):
         self.syncParentName = name
-        self.syncParentNameLabel.setText(f"ParentName: {self.syncParentName}")
+        self.syncParentNameLabel.setText(f"Parent name: {self.syncParentName}")
 
         
     def setControlLayout(self, layout):
@@ -274,16 +291,26 @@ class basicWindowWidget(QWidget):
 
         reloadParentsButton.clicked.connect(self.reloadParents)
 
-        self.syncParentNameLabel = QLabel(f"ParentName: {self.syncParentName}")
+        self.syncParentNameLabel = QLabel(f"Parent name: {self.syncParentName}")
+
+        #Delay
+        self.syncDelayLabel = QLabel(f"Sync delay: {self.syncDelay}")
 
         #Top layout
-        topLayout = QHBoxLayout()
+        hTopLayout1 = QHBoxLayout()
+        hTopLayout2 = QHBoxLayout()
+        topLayout = QVBoxLayout()
 
-        topLayout.addWidget(IDLabel)
-        topLayout.addWidget(self.parentComboBox)
-        topLayout.addWidget(reloadParentsButton)
-        topLayout.addWidget(self.syncParentNameLabel)
-        topLayout.addStretch()
+        hTopLayout1.addWidget(IDLabel)
+        hTopLayout1.addWidget(self.parentComboBox)
+        hTopLayout1.addWidget(reloadParentsButton)
+        hTopLayout2.addWidget(self.syncParentNameLabel)
+        hTopLayout2.addWidget(self.syncDelayLabel)
+        hTopLayout1.addStretch()
+        hTopLayout2.addStretch()
+
+        topLayout.addLayout(hTopLayout1)
+        topLayout.addLayout(hTopLayout2)
 
 
         #Control buttons
@@ -363,42 +390,34 @@ class basicWindowWidget(QWidget):
         self.setLayout(windowLayout)
         
 
-    def start(self):
-        #If the worker already exist
+    def start(self, checked=False, masterClock=None, delayed=False):
         if self.thread is not None:
             return
-        
-        #Check if the path is valid
+
         self.setPathOptions(self.isLiveCheckbox.isChecked())
         if not self.checkPath(self.path):
-            Message = MessageBox("Path Error!", "The path is empty and needs a file!")
+            MessageBox("Path Error!", "The path is empty and needs a file!")
             return
 
-        #Create and initialize the thread and worker
         self.thread = QThread()
-        
         self.worker = self.workerClass(self.path, self.isLive)
+        self.worker.setID(self.ID)
+        self.worker.setDelayed(delayed)
 
-        #Sends the worker to the thread
         self.worker.moveToThread(self.thread)
-
-        #Starts the worker if the thread is started
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.onWorkerFinished)
 
-        self.worker.setID(self.ID)
-        if self.hasAudio and self.muteCheckBox.checkState():
-            self.worker.mute(self.muteCheckBox.isChecked())
+        if masterClock is not None:
+            self.worker.ready.connect(masterClock.setReady)
+            self.worker.setMasterClock(masterClock)
 
-        #Connections of specific windows
         self.connectAll()
 
-        #Sets the thread garbage collection settings
         self.thread.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.finished.connect(self.onThreadFinished)
 
-        #Start the thread and so, the worker
         self.thread.start()
 
 
@@ -409,9 +428,7 @@ class basicWindowWidget(QWidget):
 
     def updateFilePath(self):
         self.filePath = self.pathInput.text()
-        print("Updating file name")
         self.fileName = os.path.basename(self.filePath)
-        print(self.fileName)
 
 
     def setIsLive(self, s: bool):
