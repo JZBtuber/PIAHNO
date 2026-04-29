@@ -4,86 +4,166 @@ from src.gui.Core import basicWindowWidget
 
 
 class MasterClock(QObject):
+    """Synchronised start clock for all active widgets.
+
+    Delay chaining
+    --------------
+    Each widget carries two pieces of information:
+
+        widget.syncDelay      – the raw offset between *this* widget and its
+                                named parent (as written by midiSync /
+                                videoSync / etc.)
+        widget.syncParentName – the filename of the parent widget
+
+    A widget can be synced to another widget that is itself synced to a
+    third one, forming a chain:
+
+        audio  (no parent)        absolute delay = 0
+          └─ midi  (parent=audio, syncDelay=+500 ms)   abs = 500
+               └─ video (parent=midi, syncDelay=+200 ms) abs = 700
+
+    MasterClock now resolves the full chain for every widget before
+    computing the release offsets, so every widget starts at the correct
+    absolute time regardless of how many hops separate it from the root.
+    """
+
     def __init__(self, windows):
         super().__init__()
         self.windows = windows
-        self.widgets = []
-        self.ready = []
-        self.released_ids = {}
+        self.widgets: list[basicWindowWidget] = []
+        self.ready: list[int] = []
+        self.released_ids: dict[int, int] = {}
 
-        self.startTime = None
-        self.pauseTime = None
-        self.totalPausedTime = 0.0
-        self.paused = False
+        self.startTime        = None
+        self.pauseTime        = None
+        self.totalPausedTime  = 0.0
+        self.paused           = False
 
+        # Collect all live widgets
         for row in self.windows:
             for widgetData in row:
                 widget = widgetData.widget
                 if isinstance(widget, basicWindowWidget) and widget is not None:
                     self.widgets.append(widget)
 
-        self.sortedWidgets = self.bubbleSort(self.widgets[:])
+        self.sortedWidgets = self._bubbleSort(self.widgets[:])
 
+    # ------------------------------------------------------------------
+    # Ready / release handshake
+    # ------------------------------------------------------------------
 
     @pyqtSlot(int)
-    def setReady(self, ID):
+    def setReady(self, ID: int):
         if ID not in self.ready:
             self.ready.append(ID)
 
         if len(self.ready) == len(self.widgets):
             self.releaseAll()
 
-
     def releaseAll(self):
-        delays_ms = [int(widget.syncDelay) for widget in self.sortedWidgets]
-        min_delay = min(delays_ms)
+        # Build a filename → widget lookup so we can follow parent links
+        by_filename: dict[str, basicWindowWidget] = {}
+        for w in self.widgets:
+            if w.fileName:
+                by_filename[w.fileName] = w
 
-        for widget, delay_ms in zip(self.sortedWidgets, delays_ms):
-            shifted_delay = delay_ms - min_delay
-            self.released_ids[widget.ID] = shifted_delay
+        # Resolve the absolute (chained) delay for every widget
+        abs_delays: dict[int, int] = {}
+        for w in self.widgets:
+            abs_delays[w.ID] = self._resolveAbsoluteDelay(w, by_filename, set())
 
-        self.startTime = time.perf_counter()
+        # Shift so the earliest widget starts at t=0
+        min_delay = min(abs_delays.values())
+
+        for w in self.sortedWidgets:
+            shifted = abs_delays[w.ID] - min_delay
+            self.released_ids[w.ID] = shifted
+
+        self.startTime       = time.perf_counter()
         self.totalPausedTime = 0.0
-        self.pauseTime = None
-        self.paused = False
+        self.pauseTime       = None
+        self.paused          = False
 
+    # ------------------------------------------------------------------
+    # Delay chain resolver
+    # ------------------------------------------------------------------
+
+    def _resolveAbsoluteDelay(
+        self,
+        widget: basicWindowWidget,
+        by_filename: dict[str, basicWindowWidget],
+        visited: set,
+    ) -> int:
+        """Return the absolute delay (ms) for *widget* by walking the
+        parent chain recursively.
+
+        *visited* guards against circular references.
+        """
+        wid = widget.ID
+
+        if wid in visited:
+            # Circular dependency – break the cycle and treat this node
+            # as if it has no further parent.
+            return int(widget.syncDelay)
+
+        visited = visited | {wid}   # immutable update – don't mutate caller's set
+
+        parent_name = getattr(widget, "syncParentName", "")
+        if not parent_name:
+            # Root widget – its syncDelay is the absolute offset from t=0
+            # (typically 0 for the audio master, non-zero if the whole
+            # session has a global pre-roll).
+            return int(widget.syncDelay)
+
+        parent = by_filename.get(parent_name)
+        if parent is None:
+            # Parent not present in this session – treat as root
+            return int(widget.syncDelay)
+
+        parent_abs = self._resolveAbsoluteDelay(parent, by_filename, visited)
+        return int(widget.syncDelay) + parent_abs
+
+    # ------------------------------------------------------------------
+    # Sorting (by raw syncDelay – used only to decide release order,
+    # which doesn't matter much now that we resolve absolute delays, but
+    # kept for compatibility)
+    # ------------------------------------------------------------------
 
     @staticmethod
-    def bubbleSort(arr):
+    def _bubbleSort(arr: list) -> list:
         n = len(arr)
-
         for i in range(n):
             swapped = False
-
-            for j in range(0, n - i - 1):
+            for j in range(n - i - 1):
                 if arr[j].syncDelay > arr[j + 1].syncDelay:
                     arr[j], arr[j + 1] = arr[j + 1], arr[j]
                     swapped = True
-
             if not swapped:
                 break
-        
         return arr
-    
 
-    def elapsedMs(self):
+    # Keep the old camelCase name so nothing else breaks
+    bubbleSort = _bubbleSort
+
+    # ------------------------------------------------------------------
+    # Clock
+    # ------------------------------------------------------------------
+
+    def elapsedMs(self) -> int:
         if self.startTime is None:
             return 0
-        
-        if self.paused and self.pauseTime is not None:
-            now = self.pauseTime
-        else:
-            now = time.perf_counter()
+
+        now = self.pauseTime if (self.paused and self.pauseTime is not None) \
+              else time.perf_counter()
 
         return int((now - self.startTime - self.totalPausedTime) * 1000)
-
 
     def setPaused(self, paused: bool):
         if paused and not self.paused:
             self.pauseTime = time.perf_counter()
-            self.paused = True
+            self.paused    = True
 
         elif not paused and self.paused:
             self.totalPausedTime += time.perf_counter() - self.pauseTime
             self.pauseTime = None
-            self.paused = False
+            self.paused    = False

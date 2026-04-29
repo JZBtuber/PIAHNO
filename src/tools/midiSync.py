@@ -7,11 +7,11 @@ class MidiSync(QDialog):
     def __init__(self, workingPath):
         super().__init__()
 
-        self.pathToMidi = ""
         self.pathToAudio = ""
+        self.pathToMidi = ""
         self.workingPath = workingPath
 
-        self.midiDelay = 0
+        self.MidiDelay = 0
 
         self.mainLayout = self.makeMainLayout()
 
@@ -34,7 +34,7 @@ class MidiSync(QDialog):
         midiBrouwseButton = QPushButton("Browse")
         midiBrouwseButton.clicked.connect(self.browseMidiFile)
 
-        inputLayout.addWidget(QLabel("Path to the midi"))
+        inputLayout.addWidget(QLabel("Path to the Midi"))
         midiLayout.addWidget(self.midiInput)
         midiLayout.addWidget(midiBrouwseButton)
         inputLayout.addLayout(midiLayout)

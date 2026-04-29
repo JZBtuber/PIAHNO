@@ -36,24 +36,10 @@ class VideoWorker(basicWorker):
         self.capture = cv2.VideoCapture(path)
 
         src_fps = self.capture.get(cv2.CAP_PROP_FPS)
-        self.src_fps   = src_fps if src_fps > 0 else 60.0
-        self.target_dt = 1.0 / self.src_fps
+        self.target_dt = 1.0 / (src_fps if src_fps > 0 else 60.0)
 
-        self.prevTime    = time.perf_counter()
+        self.prevTime   = time.perf_counter()
         self.smoothedFps = 0.0
-
-        # Pre-build the frame timeline exactly like midi.py builds its
-        # event list -- a list of (frameTimeMs, frameIndex) pairs.
-        # The loop then just walks this list forward against the clock,
-        # the same way the MIDI worker walks its event list.
-        # This means we never seek during playback, so there is no drift.
-        if not self.isLive:
-            total_frames = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.events = [
-                (int(i * 1000.0 / self.src_fps), i)
-                for i in range(total_frames)
-            ]
-            self.event_index = 0
 
         if self.useAlgorithm:
             self._setMediapipeSettings()
@@ -68,7 +54,7 @@ class VideoWorker(basicWorker):
         self.capture.release()
 
     # ------------------------------------------------------------------
-    # Live camera -- free-running, unchanged
+    # Live camera – free-running as before
     # ------------------------------------------------------------------
     def _loop_live(self):
         loop_start = time.perf_counter()
@@ -83,39 +69,36 @@ class VideoWorker(basicWorker):
         self._update_fps()
 
     # ------------------------------------------------------------------
-    # File playback -- mirrors midi.py's loop_file exactly
-    #
-    # Walk the pre-built event list forward.  For every frame whose
-    # timestamp is <= the master clock, read and display it.  Then
-    # sleep 1 ms and return, just like the MIDI worker does.
-    #
-    # Because the capture was opened sequentially and we never seek,
-    # read() always returns the next frame in order -- no pointer drift,
-    # no keyframe snapping, no cumulative speedup.
+    # File playback – driven by MasterClock
     # ------------------------------------------------------------------
     def _loop_file(self):
-        if self.event_index >= len(self.events):
+        """Seek the video to the position the MasterClock reports.
+
+        This means:
+          • Pause/resume of the MasterClock pauses/resumes the video.
+          • Sync delays set via videoSync are already baked into the
+            MasterClock offset (syncDelay on the widget → shifted_delay
+            in MasterClock.releaseAll → delay on this worker).
+          • Frame rate is governed by the clock, not a fixed sleep.
+        """
+        masterMs = self.getMasterTimeMs()
+
+        # Seek to the clock position
+        self.capture.set(cv2.CAP_PROP_POS_MSEC, masterMs)
+
+        ret, frame = self.capture.read()
+        if not ret:
+            # End of file – stop gracefully
             self.running = False
             return
 
-        nowMs = self.getMasterTimeMs()
+        self._emit_frame(frame)
 
-        while self.event_index < len(self.events):
-            frameTimeMs, frameIndex = self.events[self.event_index]
-
-            if frameTimeMs > nowMs:
-                break
-
-            ret, frame = self.capture.read()
-            if not ret:
-                self.running = False
-                return
-
-            self._emit_frame(frame)
-            self._update_fps()
-            self.event_index += 1
-
-        QThread.msleep(1)
+        # Pace to ~source fps so we don't spin at 100 % CPU.
+        # We still re-seek every iteration so skips / pauses are instant.
+        loop_start = time.perf_counter()
+        self._pace(loop_start)
+        self._update_fps()
 
     # ------------------------------------------------------------------
     # Shared helpers
@@ -135,7 +118,7 @@ class VideoWorker(basicWorker):
         self.frameReady.emit(qimg)
 
     def _pace(self, loop_start: float):
-        """Busy-wait until at least one frame-period has elapsed (live only)."""
+        """Busy-wait until at least one frame-period has elapsed."""
         target = loop_start + self.target_dt
         while True:
             remaining = target - time.perf_counter()
@@ -161,37 +144,18 @@ class VideoWorker(basicWorker):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         width  = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        self.recordStarTime = time.perf_counter()
-        self.recordedFrames = []
+        fps    = self.capture.get(cv2.CAP_PROP_FPS)
 
         ts = str(datetime.now()).replace(" ", "_").replace(":", "-")[:16]
         os.makedirs(os.path.join(os.getcwd(), f"Tests\\{ts}_Test"), exist_ok=True)
-        self.newPath = os.path.join(os.getcwd(), f"Tests\\{ts}_Test\\Video_{self.ID}.mp4")
-       
+        newPath = os.path.join(os.getcwd(), f"Tests\\{ts}_Test\\Video_{self.ID}.mp4")
+        self.output = cv2.VideoWriter(newPath, fourcc, fps, (width, height))
 
     def recordloop(self):
-        t = time.perf_counter() - self.recordStarTime
-        self.recordedFrames.append((t, self.videoFrame.copy()))
+        self.output.write(self.videoFrame)
 
     def stopRecording(self):
-        if not self.recordedFrames:
-            return
-
-        duration = self.recordedFrames[-1][0] - self.recordedFrames[0][0]
-        frame_count = len(self.recordedFrames)
-
-        real_fps = frame_count / duration if duration > 0 else 30.0
-
-        height, width = self.recordedFrames[0][1].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
-        output = cv2.VideoWriter(self.newPath, fourcc, real_fps, (width, height))
-
-        for _, frame in self.recordedFrames:
-            output.write(frame)
-
-        output.release()
+        self.output.release()
 
     # ------------------------------------------------------------------
     # Algorithm slots
@@ -212,18 +176,18 @@ class VideoWorker(basicWorker):
         self.detector = vision.HandLandmarker.create_from_options(options)
 
     def _draw_landmarks(self, rgb_image, detection_result):
-        mp_hands          = mp.tasks.vision.HandLandmarksConnections
-        mp_drawing        = mp.tasks.vision.drawing_utils
+        mp_hands        = mp.tasks.vision.HandLandmarksConnections
+        mp_drawing      = mp.tasks.vision.drawing_utils
         mp_drawing_styles = mp.tasks.vision.drawing_styles
         hand_landmarks_list = detection_result.hand_landmarks
         handedness_list     = detection_result.handedness
         annotated = (np.copy(rgb_image) if not self.useOnlyAlgorithm
                      else np.zeros_like(rgb_image))
 
-        MARGIN  = 10
-        FONT_SZ = 1
-        FONT_TH = 1
-        COLOR   = (88, 205, 54)
+        MARGIN   = 10
+        FONT_SZ  = 1
+        FONT_TH  = 1
+        COLOR    = (88, 205, 54)
 
         if not hand_landmarks_list:
             return annotated
@@ -261,11 +225,13 @@ class VideoFeed(basicWindowWidget):
         self.cameraNumber     = 0
         self.inputType        = "video"
 
+        # Preview label
         self.mainWidget = QLabel()
         self.mainWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.mainWidget.setSizePolicy(QSizePolicy.Policy.Expanding,
                                       QSizePolicy.Policy.Expanding)
 
+        # Algorithm checkboxes
         self.Hands     = QCheckBox("Use Mediapipe Algorithm")
         self.OnlyHands = QCheckBox("Use ONLY the Algorithm")
         self.FPSLabel  = QLabel("0")

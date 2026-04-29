@@ -5,6 +5,7 @@ import pyaudio
 import cv2
 import mido
 import os
+import time
 
 
 class FileDropLineEdit(QLineEdit):
@@ -105,6 +106,9 @@ class basicWorker(QObject):
         self.delayed = False
         self.released = False
 
+        self.masterClock = None
+        self.localStartTime = None
+
 
     def run(self):
         self.running = True
@@ -120,6 +124,9 @@ class basicWorker(QObject):
 
             if self.delay > 0:
                 QThread.msleep(self.delay)
+
+            # in run(), after the delay QThread.msleep and before "while self.running:"
+            self.localStartTime = time.perf_counter()
 
             while self.running:
                 if self.paused:
@@ -211,10 +218,11 @@ class basicWorker(QObject):
 
 
     def getMasterTimeMs(self):
-        if self.masterClock is None:
+        if self.masterClock is not None:
+            return self.masterClock.elapsedMs() - self.delay
+        if self.localStartTime is None:
             return 0
-
-        return self.masterClock.elapsedMs() - self.delay
+        return int((time.perf_counter() - self.localStartTime) * 1000)
     
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)
