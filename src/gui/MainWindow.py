@@ -6,6 +6,8 @@ from src.audio.midi import MidiFeed
 from src.audio.audio import AudioFeed
 from src.tools.VideoLoader import VideoLoader
 from src.tools.masterClock import MasterClock
+from src.tools.midiSync import MidiSync
+from src.tools.videoSync import VideoSync
 
 class WidgetData():
     def __init__(self, widget: QWidget = None, ID: int = 0):
@@ -113,8 +115,9 @@ class MainWindow(QMainWindow):
         self.editOptions[1].triggered.connect(self.dialog.exec)
 
         self.toolOptions1 = [QAction("Sync Midi", self),
-                              QAction("Sync Video", self),
-                              QAction("Show Delays",self)]
+                              QAction("Sync Video", self)]
+        self.toolOptions1[0].triggered.connect(self.midiSync)
+        self.toolOptions1[1].triggered.connect(self.videoSync)
         
         self.toolOptions2 = [QAction("Preload Video", self),
                              QAction("Export Key Frames",self)]
@@ -178,9 +181,13 @@ class MainWindow(QMainWindow):
         
             
     def pauseALL(self):
+        if self.clock is not None:
+            new_state = not self.clock.paused
+            self.clock.setPaused(new_state)
+
         for i in self.windows:
             for j in i:
-                if not j.widget == None:
+                if j.widget is not None:
                     j.widget.pause()
     
     def stopALL(self):
@@ -219,6 +226,19 @@ class MainWindow(QMainWindow):
         loader = VideoLoader()
         loader.exec()
         loader = None
+
+
+    def midiSync(self):
+        sync = MidiSync(self.localPath)
+        sync.exec()
+        sync = None
+
+
+    def videoSync(self):
+        sync = VideoSync(self.localPath)
+        sync.exec()
+        sync = None
+
 
 
     def getWidgetByID(self, ID: int = 0) -> QWidget:

@@ -208,6 +208,13 @@ class basicWorker(QObject):
 
     def setMasterClock(self, clock):
         self.masterClock = clock
+
+
+    def getMasterTimeMs(self):
+        if self.masterClock is None:
+            return 0
+
+        return self.masterClock.elapsedMs() - self.delay
     
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)

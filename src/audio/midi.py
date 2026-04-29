@@ -23,39 +23,7 @@ class MidiWorker(basicWorker):
         self.events = []
         self.event_index = 0
         self.next_event_time = None
-        self.song_time = 0.0
         self.inport = None
-
-
-    def midi_note_freq(self, note: int) -> float: #Returns the calculated frequency of the note
-        return 440.0 * (2.0 ** ((note - 69) / 12.0))
-
-
-    def make_chunk(self, frames: int) -> bytes:
-
-        t = np.arange(frames, dtype=np.float32) / self.sample_rate  #Numpy array for the audio
-        samples = np.zeros(frames, dtype=np.float32)                #Numpy array of the samples  
-
-        for note, velocity in list(self.active_notes.items()):      #Loop for each active note, plays the audio
-            freq = self.midi_note_freq(note)    #Gets the frequency
-            phase = self._phase.get(note, 0.0)  #Gets the phase of the note
-
-            #Simple sine wave
-            wave = np.sin((2.0 * np.pi * freq * t) + phase)
-
-               #Scaled by velocity
-            amp = (velocity / 127.0) * 0.15
-            samples += wave * amp
-
-            #Store phase's continuity
-            phase_advance = 2.0 * np.pi * freq * frames / self.sample_rate
-            self._phase[note] = (phase + phase_advance) % (2.0 * np.pi)
-
-        #Prevent clipping by cutting samples too big
-        samples = np.clip(samples, -1.0, 1.0)
-
-        #Convert float32 mono PCM
-        return samples.astype(np.float32).tobytes()
 
 
     def beforeLoop(self):
@@ -68,14 +36,17 @@ class MidiWorker(basicWorker):
             self.midi = None
             self.events = []
             self.event_index = 0
-            self.next_event_time = None
-            self.song_time = 0.0
         else:
             self.midi = mido.MidiFile(self.path, clip=True)
-            self.events = list(self.midi)
+
+            self.events = []
+            currentTimeMs = 0.0
+
+            for msg in self.midi:
+                currentTimeMs += msg.time * 1000.0
+                self.events.append((currentTimeMs, msg))
+
             self.event_index = 0
-            self.next_event_time = self.events[0].time if self.events else None
-            self.song_time = 0.0
             self.inport = None
 
         
@@ -111,23 +82,27 @@ class MidiWorker(basicWorker):
             self.running = False
             return
 
-        msg = self.events[self.event_index]
+        nowMs = self.getMasterTimeMs()
 
-        if msg.time > 0:
-            QThread.msleep(int(msg.time * 1000))
+        while self.event_index < len(self.events):
+            eventTimeMs, msg = self.events[self.event_index]
 
-        self.msg = msg
+            if eventTimeMs > nowMs:
+                break
 
-        if msg.type == "note_on" and msg.velocity > 0:
-            self.active_notes[msg.note] = msg.velocity
-            self.noteOn.emit(msg.note, msg.velocity)
+            self.msg = msg
 
-        elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
-            self.active_notes.pop(msg.note, None)
-            self.noteOff.emit(msg.note)
+            if msg.type == "note_on" and msg.velocity > 0:
+                self.active_notes[msg.note] = msg.velocity
+                self.noteOn.emit(msg.note, msg.velocity)
 
-        self.event_index += 1
+            elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
+                self.active_notes.pop(msg.note, None)
+                self.noteOff.emit(msg.note)
 
+            self.event_index += 1
+
+        QThread.msleep(1)
 
     def afterLoop(self):
         if self.inport is not None:

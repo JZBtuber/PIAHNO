@@ -23,7 +23,7 @@ def getDelayFromParent(filePath: str, parentPath: str, workingPath: str) -> int:
         return 0
     
 @staticmethod
-def setDelayForPatent(filePath:str, parentPath:str, workingPath:str, delay: int):
+def setDelayForParent(filePath:str, parentPath:str, workingPath:str, delay: int):
 
     data = []
 

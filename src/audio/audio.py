@@ -183,12 +183,12 @@ class AudioWorker(basicWorker):
         raw_level = rms / max_possible
 
         # gentler display curve, without peak normalization
-        level = raw_level * (4.0 if self.isLive else 35)   # tune this
+        level = raw_level * (4.0 if self.isLive else 4)   # tune this
         return max(0.0, min(level, 1.0))
 
 
 class AudioVisualizer(QWidget):
-    def __init__(self, bars: int = 16):
+    def __init__(self, bars: int = 64):
         super().__init__()
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
