@@ -1,5 +1,5 @@
 from src.gui.Core import *
-from PyQt6.QtWidgets import QProgressBar, QWidget, QPushButton, QCheckBox, QLabel, QDialog, QHBoxLayout, QVBoxLayout, QFileDialog
+from PyQt6.QtWidgets import QProgressBar, QPushButton, QCheckBox, QDialog, QHBoxLayout, QVBoxLayout, QFileDialog
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 import os
 import cv2
@@ -123,7 +123,7 @@ class VideoWorker(QObject):
 
 
     def setMediapipeSettings(self): #Setting the Mediapipe default settings
-        model_path = Path(__file__).resolve().with_name("hand_landmarker.task")
+        model_path = Path(f"{__file__}/../..").resolve().with_name("hand_landmarker.task")
 
         base_options = python.BaseOptions(model_asset_path=str(model_path))
         options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=4)
@@ -238,11 +238,8 @@ class VideoLoader(QDialog):
         self.loadingBar.setValue(self.frameDone)
 
 
-
-
     def pathChanged(self, str):
         self.path = str
-
 
 
     def checkPath(self):

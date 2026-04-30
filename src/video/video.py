@@ -205,7 +205,7 @@ class VideoWorker(basicWorker):
         self.useOnlyAlgorithm = value
 
     def _setMediapipeSettings(self):
-        model_path = Path(__file__).resolve().with_name("hand_landmarker.task")
+        model_path = Path(f"{__file__}/../..").resolve().with_name("hand_landmarker.task")
         base_options = python.BaseOptions(model_asset_path=str(model_path))
         options = vision.HandLandmarkerOptions(base_options=base_options,
                                                num_hands=4)

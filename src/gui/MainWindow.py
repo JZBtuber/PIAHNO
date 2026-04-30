@@ -8,6 +8,7 @@ from src.tools.VideoLoader import VideoLoader
 from src.tools.masterClock import MasterClock
 from src.tools.midiSync import MidiSync
 from src.tools.videoSync import VideoSync
+from src.tools.keyFrameExporter import KeyFrameExporter
 
 class WidgetData():
     def __init__(self, widget: QWidget = None, ID: int = 0):
@@ -122,6 +123,7 @@ class MainWindow(QMainWindow):
         self.toolOptions2 = [QAction("Preload Video", self),
                              QAction("Export Key Frames",self)]
         self.toolOptions2[0].triggered.connect(self.preload)
+        self.toolOptions2[1].triggered.connect(self.exportKeyFrames)
 
         self.menu = self.menuBar()
         self.fileMenu = self.menu.addMenu("&Files")
@@ -247,6 +249,12 @@ class MainWindow(QMainWindow):
                 if j.ID == ID and j.widget is not None:
                     return j.widget
         return None
+    
+
+    def exportKeyFrames(self):
+        keyFrameLoader = KeyFrameExporter()
+        keyFrameLoader.exec()
+        keyFrameLoader = None
 
 
 
