@@ -1,10 +1,8 @@
 import cv2
-from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot, Qt
+from PyQt6.QtCore import pyqtSignal, QThread, pyqtSlot, Qt
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import (QLabel, QWidget, QFileDialog, QVBoxLayout,
-                             QCheckBox, QSizePolicy, QHBoxLayout,
-                             QLineEdit, QPushButton, QSpinBox)
-from PyQt6.QtMultimedia import QMediaDevices
+from PyQt6.QtWidgets import (QLabel, QVBoxLayout,
+                             QCheckBox, QSizePolicy, QHBoxLayout)
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision

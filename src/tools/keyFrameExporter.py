@@ -1,13 +1,16 @@
 from PyQt6.QtCore import QObject, QThread, pyqtSlot, pyqtSignal
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, 
                              QPushButton, QFileDialog,
-                             QHBoxLayout, QProgressBar)
+                             QHBoxLayout, QProgressBar,
+                             QComboBox
+                             )
 
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 import numpy as np
+import scipy.io
 from pathlib import Path
 import cv2
 import os
@@ -130,6 +133,7 @@ class KeyFrameWorker(QObject):
 
         self.pathToVideo = ""
         self.handTracker = HandTracker()
+        self.fileFormat = ""
 
 
         self.setMediapipeSettings()
@@ -200,7 +204,13 @@ class KeyFrameWorker(QObject):
         for trackId, rows in allRows.items():
             array = np.array(rows, dtype=np.float32)
 
-            np.save(f"{newPath}_{trackId}.npy", array)
+            if self.fileFormat == ".npy":
+                np.save(f"{newPath}_{trackId}.npy", array)
+            elif self.fileFormat == ".csv":
+                np.savetxt(f"{newPath}_{trackId}.csv", array, delimiter=',')
+            elif self.fileFormat == ".mat":
+                arraymat = {"array": array}
+                scipy.io.savemat(f"{newPath}_{trackId}.mat", arraymat)
 
         self.finished.emit()
 
@@ -215,6 +225,9 @@ class KeyFrameWorker(QObject):
     
     def setPathToVideo(self, str):
         self.pathToVideo = str
+
+    def setFileFormat(self, str):
+        self.fileFormat = str
 
 
 class KeyFrameExporter(QDialog):
@@ -252,6 +265,10 @@ class KeyFrameExporter(QDialog):
         startButton = QPushButton("Start")
         startButton.clicked.connect(self.start)
 
+        self.fileTypeComboBox = QComboBox()
+        self.fileTypeComboBox.addItems([".npy", ".csv", ".mat"])
+
+        mainLayout.addWidget(self.fileTypeComboBox)
         mainLayout.addWidget(startButton)
 
         return mainLayout
@@ -265,6 +282,7 @@ class KeyFrameExporter(QDialog):
         self.worker = KeyFrameWorker()
 
         self.worker.setPathToVideo(self.pathToVideo)
+        self.worker.setFileFormat(self.fileTypeComboBox.currentText() if self.fileTypeComboBox.currentText() != "" else ".npy")
 
         #Connecting signals
         self.worker.frameCount.connect(self.getLoadingLayout)
@@ -289,9 +307,9 @@ class KeyFrameExporter(QDialog):
     def browseFile(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select audio file",
+            "Select video file",
             "",
-            "MOV Files (*.MOV);;Mp4 Files (*.mp4);;All Files (*)"
+            "video Files (*.MOV *.mp4);;All Files (*)"
         )
         if path:
             self.videoPathInput.setText(path)

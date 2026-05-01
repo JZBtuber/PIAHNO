@@ -9,6 +9,7 @@ from src.tools.masterClock import MasterClock
 from src.tools.midiSync import MidiSync
 from src.tools.videoSync import VideoSync
 from src.tools.keyFrameExporter import KeyFrameExporter
+from src.video.keyFrames import KeyFeed
 
 class WidgetData():
     def __init__(self, widget: QWidget = None, ID: int = 0):
@@ -298,6 +299,9 @@ class WindowChoice(QDialog):
         addWindowButtonAudio = QPushButton("Add a Audio Feed")
         addWindowButtonAudio.clicked.connect(self.setAudio)
         addWindowButtonAudio.clicked.connect(self.addWindow)
+        addWindowButtonKeyFrames = QPushButton("Add a KeyFrame Feed")
+        addWindowButtonKeyFrames.clicked.connect(self.setKeyFrames)
+        addWindowButtonKeyFrames.clicked.connect(self.addWindow)
 
         hor0.addWidget(removeWindowButton)
         hor0.addWidget(self.removeWindowSpinBox)
@@ -305,6 +309,7 @@ class WindowChoice(QDialog):
         hor1.addWidget(addWindowButtonVideo)
         hor1.addWidget(addWindowButtonAudio)
         hor1.addWidget(addWindowButtonMidi)
+        hor1.addWidget(addWindowButtonKeyFrames)
         
 
         vert.addLayout(hor0)
@@ -320,6 +325,9 @@ class WindowChoice(QDialog):
 
     def setAudio(self):
         self.widget = AudioFeed
+
+    def setKeyFrames(self):
+        self.widget = KeyFeed
 
     def addWindow(self, checked = False):
         self.mainWindow.addWindow(self.widget)

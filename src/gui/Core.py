@@ -539,6 +539,8 @@ class basicWindowWidget(QWidget):
             self.devices = self.getAudioDevicesPyAudio()
         elif backend == "midi":
             self.devices = self.getMidiInputDevices()
+        elif backend == "keyFrame":
+            self.devices = []
         else:
             raise ValueError(f"Unknown backend: {backend}")
 
