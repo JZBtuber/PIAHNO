@@ -1,11 +1,13 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
 from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from src.tools.fileIO import *
+from pathlib import Path
 import pyaudio
 import cv2
 import mido
 import os
 import time
+
 
 
 class FileDropLineEdit(QLineEdit):
@@ -416,7 +418,7 @@ class basicWindowWidget(QWidget):
             return
 
         self.setPathOptions(self.isLiveCheckbox.isChecked())
-        if not self.checkPath(self.path):
+        if not checkPath(self.path):
             MessageBox("Path Error!", "The path is empty and needs a file!")
             return
 
@@ -507,13 +509,6 @@ class basicWindowWidget(QWidget):
         )
         if path:
             self.pathInput.setText(path)
-
-    
-    def checkPath(self, path):
-        if path:
-            return True
-        else:
-            return False
         
 
     def connectAll(self):
@@ -610,3 +605,14 @@ class basicWindowWidget(QWidget):
     def onThreadFinished(self):
         self.worker = None
         self.thread = None
+
+
+
+@staticmethod
+def checkPath(str) -> bool:
+    bans = ['[', ']', '{', '}', '<', '>', '#']
+
+    return str != "" and Path.exists(Path(str)) and not any(char in str for char in bans)
+         
+
+
