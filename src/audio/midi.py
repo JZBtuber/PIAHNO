@@ -116,9 +116,9 @@ class MidiWorker(basicWorker):
 
     def initRecording(self):
 
-        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
-        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
-        self.newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Midi_{self.ID}.mid")
+        timeStr = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:19]
+        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{timeStr}_Test"), exist_ok=True)
+        self.newPath = os.path.join(os.getcwd(), f"Tests\\{timeStr}_Test\\Midi_{self.ID}.mid")
         
         self.midi_recording = mido.MidiFile(ticks_per_beat=480)
         self.track = mido.MidiTrack()

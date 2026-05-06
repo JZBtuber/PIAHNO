@@ -1,13 +1,15 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
-from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
 from src.tools.fileIO import *
 from pathlib import Path
+import numpy as np
+import scipy
 import pyaudio
+import librosa
 import cv2
 import mido
 import os
 import time
-
 
 
 class FileDropLineEdit(QLineEdit):
@@ -127,10 +129,10 @@ class basicWorker(QObject):
             if self.delay > 0:
                 QThread.msleep(self.delay)
 
-            # in run(), after the delay QThread.msleep and before "while self.running:"
             self.localStartTime = time.perf_counter()
 
             while self.running:
+
                 if self.paused:
                     QThread.msleep(50)
                     continue
@@ -169,7 +171,6 @@ class basicWorker(QObject):
             self.isRecording = True
 
         self.recordloop()
-
 
         if not self.record:
             self.stopRecording()
@@ -225,7 +226,8 @@ class basicWorker(QObject):
         if self.localStartTime is None:
             return 0
         return int((time.perf_counter() - self.localStartTime) * 1000)
-    
+
+
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)
 
@@ -609,10 +611,9 @@ class basicWindowWidget(QWidget):
 
 
 @staticmethod
-def checkPath(str) -> bool:
+def checkPath(path) -> bool:
     bans = ['[', ']', '{', '}', '<', '>', '#']
 
-    return str != "" and Path.exists(Path(str)) and not any(char in str for char in bans)
+    return True
+    return (path != "" and Path.exists(Path(path)) and not any(char in path for char in bans)) if not str(path).isnumeric() else str(path).isnumeric()
          
-
-

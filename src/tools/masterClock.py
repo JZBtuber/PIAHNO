@@ -4,28 +4,6 @@ from src.gui.Core import basicWindowWidget
 
 
 class MasterClock(QObject):
-    """Synchronised start clock for all active widgets.
-
-    Delay chaining
-    --------------
-    Each widget carries two pieces of information:
-
-        widget.syncDelay      – the raw offset between *this* widget and its
-                                named parent (as written by midiSync /
-                                videoSync / etc.)
-        widget.syncParentName – the filename of the parent widget
-
-    A widget can be synced to another widget that is itself synced to a
-    third one, forming a chain:
-
-        audio  (no parent)        absolute delay = 0
-          └─ midi  (parent=audio, syncDelay=+500 ms)   abs = 500
-               └─ video (parent=midi, syncDelay=+200 ms) abs = 700
-
-    MasterClock now resolves the full chain for every widget before
-    computing the release offsets, so every widget starts at the correct
-    absolute time regardless of how many hops separate it from the root.
-    """
 
     def __init__(self, windows):
         super().__init__()
@@ -94,11 +72,6 @@ class MasterClock(QObject):
         by_filename: dict[str, basicWindowWidget],
         visited: set,
     ) -> int:
-        """Return the absolute delay (ms) for *widget* by walking the
-        parent chain recursively.
-
-        *visited* guards against circular references.
-        """
         wid = widget.ID
 
         if wid in visited:
@@ -145,9 +118,6 @@ class MasterClock(QObject):
     # Keep the old camelCase name so nothing else breaks
     bubbleSort = _bubbleSort
 
-    # ------------------------------------------------------------------
-    # Clock
-    # ------------------------------------------------------------------
 
     def elapsedMs(self) -> int:
         if self.startTime is None:

@@ -211,13 +211,15 @@ class MainWindow(QMainWindow):
         for i in self.windows:
             for j in i:
                 if not j.widget == None:
-                    j.widget.setRecord(True)
+                    if hasattr(j.widget, "setRecord"):
+                        j.widget.setRecord(True)
 
     def stopRecordingALL(self):
         for i in self.windows:
             for j in i:
                 if not j.widget == None:
-                    j.widget.setRecord(False)
+                    if hasattr(j.widget, "setRecord"):
+                        j.widget.setRecord(False)
 
 
     def contextMenu(self):

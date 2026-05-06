@@ -97,12 +97,12 @@ class KeyFeed(basicWindowWidget):
         self.isLiveFeed = False
 
         self.HAND_CONNECTIONS = [
-            (0, 1), (1, 2), (2, 3), (3, 4),         # thumb
-            (0, 5), (5, 6), (6, 7), (7, 8),         # index
-            (5, 9), (9, 10), (10, 11), (11, 12),    # middle
-            (9, 13), (13, 14), (14, 15), (15, 16),  # ring
-            (13, 17), (17, 18), (18, 19), (19, 20), # pinky
-            (0, 17),                                 # palm edge
+            (0, 1, 6), (1, 2, 1), (2, 3, 1), (3, 4, 1),         # thumb
+            (1, 5, 6), (5, 6, 2), (6, 7, 2), (7, 8, 2),         # index
+            (5, 9, 6), (9, 10, 3), (10, 11, 3), (11, 12, 3),    # middle
+            (9, 13, 6), (13, 14, 4), (14, 15, 4), (15, 16, 4),  # ring
+            (13, 17, 6), (17, 18, 5), (18, 19, 5), (19, 20, 5), # pinky
+            (0, 17, 6),                                 # palm edge
         ]
 
         self.view = Qt3DWindow()
@@ -120,7 +120,7 @@ class KeyFeed(basicWindowWidget):
         self.bone_meshes = []
 
         self.point_scale = 100 * 0.25
-        self.sphere_radius = 0.3 * 0.25
+        self.sphere_radius = 0.3 * 0.40
         self.bone_radius = 0.1 * 0.25
 
         self.setup_camera()
@@ -160,11 +160,22 @@ class KeyFeed(basicWindowWidget):
         self.controller.setLookSpeed(90.0)
 
     def setup_point_spheres(self, count: int):
-        material = QPhongMaterial(self.root)
-        material.setDiffuse(Qt.GlobalColor.green)
-
-        for _ in range(count):
+        for i in range(count):
             entity = QEntity(self.root)
+            material = QPhongMaterial(self.root)
+
+            if 1 < i < 5:
+                material.setDiffuse(Qt.GlobalColor.cyan)
+            elif 5 < i < 9:
+                material.setDiffuse(Qt.GlobalColor.magenta)
+            elif 9 < i < 13:
+                material.setDiffuse(Qt.GlobalColor.blue)
+            elif 13 < i < 17:
+                material.setDiffuse(Qt.GlobalColor.green)
+            elif 17 < i < 21:
+                material.setDiffuse(Qt.GlobalColor.red)
+            elif i == 0 or i == 1 or i ==5 or i == 8 or i == 12 or i == 16:
+                material.setDiffuse(Qt.GlobalColor.gray)
 
             mesh = QSphereMesh()
             mesh.setRadius(self.sphere_radius)
@@ -180,15 +191,25 @@ class KeyFeed(basicWindowWidget):
 
 
     def setup_bones(self):
-        material = QPhongMaterial(self.root)
-        material.setDiffuse(Qt.GlobalColor.green)
-
-        for _a, _b in self.HAND_CONNECTIONS:
+        for _a, _b, _c in self.HAND_CONNECTIONS:
             entity = QEntity(self.root)
-
+            material = QPhongMaterial(self.root)   
             mesh = QCylinderMesh()
             mesh.setRadius(self.bone_radius)
             mesh.setLength(1.0)
+
+            if _c == 1:
+                material.setDiffuse(Qt.GlobalColor.cyan)
+            elif _c == 2:
+                material.setDiffuse(Qt.GlobalColor.magenta)
+            elif _c == 3:
+                material.setDiffuse(Qt.GlobalColor.blue)
+            elif _c == 4:
+                material.setDiffuse(Qt.GlobalColor.green)
+            elif _c == 5:
+                material.setDiffuse(Qt.GlobalColor.red)
+            elif _c == 6:
+                material.setDiffuse(Qt.GlobalColor.gray)
 
             transform = QTransform()
             transform.setTranslation(QVector3D(9999, 9999, 9999))
@@ -219,18 +240,18 @@ class KeyFeed(basicWindowWidget):
         vec_points = []
 
         for i in range(21):
-            x, y, z = points[i]
+            x, y, z = points[i] - points[0]
 
             p = QVector3D(
                 float(x) * self.point_scale,
-                -(float(y) * self.point_scale) -3,
+                -(float(y) * self.point_scale),
                 -(float(z) * self.point_scale)
             )
 
             vec_points.append(p)
             self.sphere_transforms[i].setTranslation(p)
 
-        for bone_index, (a_idx, b_idx) in enumerate(self.HAND_CONNECTIONS):
+        for bone_index, (a_idx, b_idx, c) in enumerate(self.HAND_CONNECTIONS):
             self.updateBone(bone_index, vec_points[a_idx], vec_points[b_idx])
         
 

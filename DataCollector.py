@@ -10,7 +10,6 @@ import faulthandler
 #----------------------------------------------------------------#
 
 faulthandler.enable()
-
 localPath = os.path.dirname(os.path.realpath(__file__))
 
 app = Application(localPath)

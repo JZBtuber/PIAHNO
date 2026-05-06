@@ -78,9 +78,6 @@ class AudioWorker(basicWorker):
             )
 
     def loop(self):
-        if self.paused:
-            QThread.msleep(20)
-            return
 
         if self.isLive:
             try:
@@ -143,7 +140,7 @@ class AudioWorker(basicWorker):
     def initRecording(self):
         self.frames = []
         
-        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:16]
+        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:19]
         os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
         self.newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Audio_{self.ID}.wav")
 

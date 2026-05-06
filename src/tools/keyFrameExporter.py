@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout,
                              QHBoxLayout, QProgressBar,
                              QComboBox
                              )
+from src.tools.mediapipe.algorithms import mediaWork
 
 import mediapipe as mp
 from mediapipe.tasks import python
@@ -26,117 +27,22 @@ class HandTrack:
         self.missedFrames = 0
 
 
-class HandTracker:
-    def __init__(self, maxDistance = 0.20, maxMissedFrames = 300):
-        self.tracks = []
-        self.nextId = 0
-        self.maxDistance = maxDistance
-        self.maxMissedFrames = maxMissedFrames
-
-
-    def getDistance(self, x, y):
-        return math.sqrt((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2)
-
-
-    def getHandCentre(self, landmarks):
-        x = sum(p.x for p in landmarks) / len(landmarks)
-        y = sum(p.y for p in landmarks) / len(landmarks)
-        return (x, y)
-
-
-    def update(self, detected_hands, frame_index):
-        """
-        detected_hands = result.hand_landmarks
-        returns: list of (track_id, landmarks)
-        """
-
-        assignments = []
-        usedTracks = set()
-        usedDetections = set()
-
-        detections = [{
-                "index" : i,
-                "landmarks" : landmarks,
-                "position" : self.getHandCentre(landmarks)
-            }
-            for i, landmarks in enumerate(detected_hands)
-        ]
-
-        candidates = []
-
-        for detection in detections:
-            for trackIndex, track in enumerate(self.tracks):
-                distance = self.getDistance(detection["position"], track.position)
-
-                if distance <= self.maxDistance:
-                    candidates.append((distance, detection["index"], trackIndex))
-
-        candidates.sort(key=lambda x: x[0])
-
-        for dist, detectionIndex, trackIndex in candidates:
-            if detectionIndex in usedDetections:
-                continue
-
-            if trackIndex in usedTracks:
-                continue
-
-            detection = detections[detectionIndex]
-            track = self.tracks[trackIndex]
-
-            track.position = detection["position"]
-            track.lastSeenFrame = frame_index
-            track.missedFrames = 0
-
-            assignments.append((track.id, detection["index"], detection["landmarks"]))
-
-            usedDetections.add(detectionIndex)
-            usedTracks.add(trackIndex)
-
-        for detection in detections:
-            if detection["index"] in usedDetections:
-                continue
-
-            new_track = HandTrack(
-                self.nextId,
-                detection["position"],
-                frame_index
-            )
-
-            self.tracks.append(new_track)
-
-            assignments.append((new_track.id, detection["index"], detection["landmarks"]))
-
-            self.nextId += 1
-
-        # Increase missed count for tracks not seen this frame
-        for track_index, track in enumerate(self.tracks):
-            if track_index not in usedTracks:
-                track.missedFrames += 1
-
-        # Remove tracks that have been missing too long
-        self.tracks = [
-            track for track in self.tracks
-            if track.missedFrames <= self.maxMissedFrames
-        ]
-
-        return assignments
-
-
-
 class KeyFrameWorker(QObject):
     frameCount = pyqtSignal(int)
     frameDone = pyqtSignal()
     finished = pyqtSignal()
+    
 
     def __init__(self):
         super().__init__()
 
         self.pathToVideo = ""
-        self.handTracker = HandTracker()
+        self.pathToPoint = ""
         self.fileFormat = ""
-
-
-        self.setMediapipeSettings()
+        self.algorithm = mediaWork()
+        self.pcl = None
+        self.cameraParameters = None
+        self.pathToCameraParameters = ""
 
     
     def run(self):
@@ -151,14 +57,25 @@ class KeyFrameWorker(QObject):
         frameNumber = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = capture.get(cv2.CAP_PROP_FPS)
         
-
         self.frameCount.emit(frameNumber)
+        
+
+        if self.pathToCameraParameters != "":
+            self.cameraParameters = self.loadCameraParameters(self.pathToCameraParameters)
+        
 
         framesDone = 0
 
         newPath = os.path.join(os.path.dirname(self.pathToVideo), f"{os.path.splitext(os.path.basename(self.pathToVideo))[0]}_KeyFrames")
 
         allRows = {}
+
+        self.pointFrames = None
+
+        if self.pathToPoint != "" and os.path.exists(self.pathToPoint):
+            loaded = np.load(self.pathToPoint, allow_pickle=False)
+            pointData = loaded[loaded.files[0]]
+
 
         while framesDone < frameNumber and capture.isOpened():
 
@@ -168,33 +85,42 @@ class KeyFrameWorker(QObject):
 
             timestamp_ms = int(framesDone * 1000 / fps)
 
-            rgbFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgbFrame)
+            currentPcl = pointData[framesDone] if framesDone < len(pointData) else None
 
-            result = self.detector.detect_for_video(mp_image, timestamp_ms)
+            data = self.algorithm.get3dpoints(frame, 
+                                              fps, 
+                                              currentPcl if currentPcl is not None else None,
+                                              self.cameraParameters if self.cameraParameters is not None else None)
 
-            if result.hand_landmarks and result.hand_world_landmarks:
-                trackedHands = self.handTracker.update(
-                    result.hand_landmarks,
-                    framesDone
-                )
+            leftHand, rightHand = data
 
-                for trackId, handIndex, landmarks in trackedHands:
-                    world = result.hand_world_landmarks[handIndex]
-                    wrist = world[0]
+            hands = {
+                "left": leftHand,
+                "right": rightHand
+            }
 
-                    if trackId not in allRows:
-                        allRows[trackId] = []
+            for handName, handData in hands.items():
+                if len(handData) != 21:
+                    continue
 
-                    for landmarkId, point in enumerate(world):
-                        allRows[trackId].append([
+                if handName not in allRows:
+                    allRows[handName] = []
+
+                for landmarkId, point in enumerate(handData):
+                    
+                    if len(point) >= 5:
+                        x3d = point[2] if point[2] is not None else np.nan
+                        y3d = point[3] if point[3] is not None else np.nan
+                        z3d = point[4] if point[4] is not None else np.nan
+
+                        allRows[handName].append([
                             framesDone,
                             timestamp_ms,
                             landmarkId,
-                            point.x - wrist.x,
-                            point.y - wrist.y,
-                            point.z - wrist.z
-                        ])
+                            x3d,
+                            y3d,
+                            z3d
+                                    ])
 
             framesDone += 1
             self.frameDone.emit()
@@ -215,26 +141,38 @@ class KeyFrameWorker(QObject):
         self.finished.emit()
 
 
-    def setMediapipeSettings(self): #Setting the Mediapipe default settings
-        model_path = Path(f"{__file__}/../..").resolve().with_name("hand_landmarker.task")
-
-        base_options = python.BaseOptions(model_asset_path=str(model_path))
-        options = vision.HandLandmarkerOptions(base_options=base_options, running_mode=vision.RunningMode.VIDEO, num_hands=4)
-        self.detector = vision.HandLandmarker.create_from_options(options)
-
-    
     def setPathToVideo(self, str):
         self.pathToVideo = str
+
 
     def setFileFormat(self, str):
         self.fileFormat = str
 
+
+    def setPathToPoints(self, str):
+        self.pathToPoint = str
+
+
+    def setPathToCameraParameters(self, str):
+        self.pathToCameraParameters = str
+
+
+    def loadCameraParameters(self, path):
+        import json
+
+        if path == "" or not os.path.exists(path):
+            return None
+
+        with open(path, "r", encoding="utf-8") as file:
+            return json.load(file)
 
 class KeyFrameExporter(QDialog):
     def __init__(self):
         super().__init__()
 
         self.pathToVideo = ""
+        self.pathToPoint = ""
+        self.pathToCameraParameters = ""
 
         self.thread = None
         self.worker = None
@@ -248,19 +186,46 @@ class KeyFrameExporter(QDialog):
     def makeBasicLayout(self):
         mainLayout = QVBoxLayout()
 
-        inputLayout = QHBoxLayout()
+        inputLayout1 = QHBoxLayout()
+        inputLayout2 = QHBoxLayout()
+        inputLayout3 = QHBoxLayout()
 
         self.videoPathInput = FileDropLineEdit()
         self.videoPathInput.textChanged.connect(self.setPathToVideo)
         self.videoPathInput.setMinimumWidth(400)
+        self.videoPathInput.setPlaceholderText("Video path...")
 
-        browseButton = QPushButton("Browse")
-        browseButton.clicked.connect(self.browseFile)
+        videoBrowseButton = QPushButton("Browse")
+        videoBrowseButton.clicked.connect(self.browseVideoFile)
 
-        inputLayout.addWidget(self.videoPathInput)
-        inputLayout.addWidget(browseButton)
+        self.pointPathInput = FileDropLineEdit()
+        self.pointPathInput.textChanged.connect(self.setPathToPoints)
+        self.pointPathInput.setMinimumWidth(400)
+        self.pointPathInput.setPlaceholderText("Point path...")
 
-        mainLayout.addLayout(inputLayout)
+        pointBrowseButton = QPushButton("Browse")
+        pointBrowseButton.clicked.connect(self.browsePointFile)
+
+        self.cameraPathInput = FileDropLineEdit()
+        self.cameraPathInput.textChanged.connect(self.setPathToCamera)
+        self.cameraPathInput.setMinimumWidth(400)
+        self.cameraPathInput.setPlaceholderText("Camera settings path...")
+
+        cameraBrowseButton = QPushButton("Browse")
+        cameraBrowseButton.clicked.connect(self.browseCameraFile)
+
+        inputLayout1.addWidget(self.videoPathInput)
+        inputLayout1.addWidget(videoBrowseButton)
+
+        inputLayout2.addWidget(self.pointPathInput)
+        inputLayout2.addWidget(pointBrowseButton)
+
+        inputLayout3.addWidget(self.cameraPathInput)
+        inputLayout3.addWidget(cameraBrowseButton)
+
+        mainLayout.addLayout(inputLayout1)
+        mainLayout.addLayout(inputLayout2)
+        mainLayout.addLayout(inputLayout3)
 
         startButton = QPushButton("Start")
         startButton.clicked.connect(self.start)
@@ -282,13 +247,16 @@ class KeyFrameExporter(QDialog):
         self.worker = KeyFrameWorker()
 
         self.worker.setPathToVideo(self.pathToVideo)
+        self.worker.setPathToPoints(self.pathToPoint)
+        self.worker.setPathToCameraParameters(self.pathToCameraParameters)
+
         self.worker.setFileFormat(self.fileTypeComboBox.currentText() if self.fileTypeComboBox.currentText() != "" else ".npy")
 
         #Connecting signals
         self.worker.frameCount.connect(self.getLoadingLayout)
         self.worker.frameDone.connect(self.updateLoading)
         self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.close)
+
 
         #Sends the worker to the thread
         self.worker.moveToThread(self.thread)
@@ -304,7 +272,7 @@ class KeyFrameExporter(QDialog):
         #Start the thread and so, the worker
         self.thread.start()
 
-    def browseFile(self):
+    def browseVideoFile(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select video file",
@@ -314,9 +282,37 @@ class KeyFrameExporter(QDialog):
         if path:
             self.videoPathInput.setText(path)
 
+
+    def browsePointFile(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select point file",
+            "",
+            "Point Files (*.npz);;All Files (*)"
+        )
+        if path:
+            self.pointPathInput.setText(path)
+
+
+    def browseCameraFile(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select a camera file",
+            "",
+            "Camera Files (*.json);;All Files (*)"
+        )
+        if path:
+            self.cameraPathInput.setText(path)
+
         
     def setPathToVideo(self, str):
         self.pathToVideo = str
+
+    def setPathToPoints(self, str):
+        self.pathToPoint = str
+
+    def setPathToCamera(self, str):
+        self.pathToCameraParameters = str
 
 
     @pyqtSlot(int)
