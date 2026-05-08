@@ -39,8 +39,9 @@ class AudioWorker(basicWorker):
         
         if self.isLive:
             self.wf = None
+            print("thinkIsLive")
 
-            deviceInfo = self.p.get_device_info_by_index(self.path)
+            deviceInfo = self.p.get_device_info_by_index(int(self.path))
             FORMAT = pyaudio.paInt16
 
             self.sample_width = self.p.get_sample_size(FORMAT)

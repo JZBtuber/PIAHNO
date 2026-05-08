@@ -18,7 +18,7 @@ class Zed():
         self.zed = sl.Camera()
         
         self.init_params = sl.InitParameters(input_t=self.InputType)
-        self.init_params.camera_resolution = sl.RESOLUTION.HD720
+        self.init_params.camera_resolution = sl.RESOLUTION.HD1080
         self.init_params.camera_fps = self.fps
         self.init_params.depth_mode = sl.DEPTH_MODE.NEURAL
         self.init_params.coordinate_units = sl.UNIT.METER

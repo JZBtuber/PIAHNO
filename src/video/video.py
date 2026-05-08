@@ -37,19 +37,13 @@ class VideoWorker(basicWorker):
     # Worker lifecycle
     # ------------------------------------------------------------------
     def beforeLoop(self):
-        if self.isLive:
-            if self.useDepthCamera:
-                path = None
-            else:
-                path = int(self.path) if str(self.path).strip() != "" else 0
-        else:
-            path = self.path
+        path = self.path
 
         if not self.useDepthCamera:
-            self.capture = cv2.VideoCapture(path, cv2.CAP_DSHOW)
+            self.capture = cv2.VideoCapture(path, (cv2.CAP_DSHOW if self.isLive else None))
 
             src_fps = self.capture.get(cv2.CAP_PROP_FPS)
-            self.src_fps   = src_fps if src_fps > 0 else 30.0
+            self.src_fps = src_fps if src_fps > 0 else 30.0
             self.fpsReady.emit(self.src_fps)
 
             self.target_dt = 1.0 / self.src_fps
@@ -118,8 +112,10 @@ class VideoWorker(basicWorker):
 
 
     def _loop_file(self):
+        print("loop file")
         if self.event_index >= len(self.events):
             self.running = False
+            self.finished.emit()
             return
 
         nowMs = self.getMasterTimeMs()
@@ -323,6 +319,9 @@ class VideoFeed(basicWindowWidget):
         self.Hands     = QCheckBox("Use Mediapipe Algorithm")
         self.OnlyHands = QCheckBox("Use ONLY the Algorithm")
         self.depthCamera = QCheckBox("Use Depth Camera ")
+        self.depthCamera.setEnabled(False
+        )
+
         self.FPSLabel  = QLabel("0")
 
         self.controlLayout = QVBoxLayout()
@@ -362,3 +361,11 @@ class VideoFeed(basicWindowWidget):
 
     def checkPath(self, path):
         return True if self.isLive else super().checkPath(path)
+
+    def setIsLive(self, s):
+        super().setIsLive(s)
+
+        if not s:
+            self.depthCamera.setChecked(False)
+
+        self.depthCamera.setEnabled(s)

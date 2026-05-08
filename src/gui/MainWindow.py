@@ -212,14 +212,20 @@ class MainWindow(QMainWindow):
             for j in i:
                 if not j.widget == None:
                     if hasattr(j.widget, "setRecord"):
-                        j.widget.setRecord(True)
+                        if hasattr(j.widget, "worker"):
+                            if hasattr(j.widget.worker, "running"):
+                                if j.widget.worker.running:
+                                    j.widget.setRecord(True)
 
     def stopRecordingALL(self):
         for i in self.windows:
             for j in i:
                 if not j.widget == None:
                     if hasattr(j.widget, "setRecord"):
-                        j.widget.setRecord(False)
+                        if hasattr(j.widget, "worker"):
+                            if hasattr(j.widget.worker, "running"):
+                                if j.widget.worker.running:
+                                    j.widget.setRecord(False)
 
 
     def contextMenu(self):
@@ -258,7 +264,6 @@ class MainWindow(QMainWindow):
         keyFrameLoader = KeyFrameExporter()
         keyFrameLoader.exec()
         keyFrameLoader = None
-
 
 
 class topMenu(QToolBar):
@@ -364,15 +369,3 @@ class WindowChoice(QDialog):
                         self.buttons.append(button)
             
         super().exec()
-
-    
-
-
-
-
-
-
-
-
-        
-    

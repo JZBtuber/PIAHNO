@@ -2,12 +2,7 @@ from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
 from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
 from src.tools.fileIO import *
 from pygrabber.dshow_graph import FilterGraph
-from pathlib import Path
-import numpy as np
-import scipy
 import pyaudio
-import librosa
-import cv2
 import mido
 import os
 import time
@@ -176,6 +171,12 @@ class basicWorker(QObject):
     def run(self):
         self.running = True
         try:
+
+            if not self.isLive and self.path == "":
+                self.running = False
+                self.finished.emit()
+                return
+
             self.beforeLoop()
             self.ready.emit(self.ID)
 
@@ -458,8 +459,10 @@ class basicWindowWidget(QWidget):
         self.startButton.clicked.connect(self.start)
         self.pauseButton.clicked.connect(self.pause)
         stopButton.clicked.connect(self.stop)
+        
         if self.hasAudio:
             self.muteCheckBox = QCheckBox("Mute")
+            self.muteCheckBox.setEnabled(False)
             self.muteCheckBox.clicked.connect(self.mute)
             
         #Control layout
@@ -473,13 +476,14 @@ class basicWindowWidget(QWidget):
 
         #Device Control
         self.isLiveCheckbox = QCheckBox("Use live input")
-        self.isLiveCheckbox.toggled.connect(self.setIsLive)
+        self.isLiveCheckbox.stateChanged.connect(self.setIsLive)
 
         reloadDevicesButton = QPushButton("Reload Devices")
         reloadDevicesButton.clicked.connect(self.reloadDevices)
 
         self.deviceComboBox = QComboBox()
         self.deviceComboBox.setPlaceholderText("Device to use")
+        self.deviceComboBox.currentIndexChanged.connect(lambda x: self.isLiveCheckbox.setChecked(True))
         self.getDevices(self.inputType)
 
         for device in self.devices:
@@ -492,7 +496,7 @@ class basicWindowWidget(QWidget):
         deviceControlLayout.addWidget(reloadDevicesButton)
         deviceControlLayout.addWidget(self.deviceComboBox)
 
-        #Video path
+        #Path Input
         self.pathInput = FileDropLineEdit()
         self.pathInput.setPlaceholderText("Path to the file...")
         self.pathInput.textChanged.connect(self.updateFilePath)
@@ -526,6 +530,7 @@ class basicWindowWidget(QWidget):
 
     def start(self, checked=False, masterClock=None, delayed=False):
         if self.thread is not None:
+            print("Returning")
             return
 
         self.setPathOptions(self.isLiveCheckbox.isChecked())
@@ -550,6 +555,7 @@ class basicWindowWidget(QWidget):
         self.thread.finished.connect(self.onThreadFinished)
 
         self.thread.start()
+        print("thread started")
 
 
     def pause(self):
@@ -558,6 +564,7 @@ class basicWindowWidget(QWidget):
 
 
     def updateFilePath(self):
+        self.isLiveCheckbox.setChecked(False)
         self.filePath = self.pathInput.text()
         self.fileName = os.path.basename(self.filePath)
 
@@ -565,9 +572,16 @@ class basicWindowWidget(QWidget):
     def setIsLive(self, s: bool):
         self.isLive = s
 
-    
+        if self.hasAudio and not s:
+            self.muteCheckBox.setChecked(False)
+
+        if self.hasAudio:
+            self.muteCheckBox.setEnabled(s)
+
+
     def setRecord(self, s):
-        self.worker.setRecord(s)
+        if self.worker is not None:
+            self.worker.setRecord(s)
 
 
     def stop(self):
@@ -579,10 +593,13 @@ class basicWindowWidget(QWidget):
                 self.worker.stop()
             except Exception:
                 pass
-
+            finally:
+                self.worker = None
+        
         if self.thread is not None:
             self.thread.quit()
             self.thread.wait()
+            self.thread = None
 
     def mute(self, s):
         if self.worker is not None:
@@ -598,6 +615,7 @@ class basicWindowWidget(QWidget):
             self.path = self.livePath
         else:
             self.path = self.filePath
+        print(self.path)
 
 
     def getDelay(self):
@@ -701,6 +719,7 @@ class basicWindowWidget(QWidget):
 
 
     def onThreadFinished(self):
+        self.startButton.setChecked(False)
         self.worker = None
         self.thread = None
 
