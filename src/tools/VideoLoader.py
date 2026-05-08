@@ -207,7 +207,7 @@ class VideoLoader(QDialog):
             self,
             "Select audio file",
             "",
-            "MOV Files (*.MOV);;Mp4 Files (*.mp4);;All Files (*)"
+            "Video Files (*.MOV *.mp4);;All Files (*)"
         )
         if path:
             self.pathInput.setText(path)
@@ -216,5 +216,6 @@ class VideoLoader(QDialog):
     def onThreadFinished(self):
         self.worker = None
         self.thread = None
+        self.close()
 
 

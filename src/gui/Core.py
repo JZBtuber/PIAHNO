@@ -1,6 +1,7 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
 from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
 from src.tools.fileIO import *
+from pygrabber.dshow_graph import FilterGraph
 from pathlib import Path
 import numpy as np
 import scipy
@@ -12,13 +13,36 @@ import os
 import time
 
 
+class MessageBox(QMessageBox):
+    def __init__(self, Name: str, Message: str):
+        super().__init__()
+
+        #Set the main message text
+        self.setText(Message)
+
+        #Set the window title (top bar)
+        self.setWindowTitle(Name)
+
+        #Set the available buttons (only OK)
+        self.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+        #Set default button
+        self.setDefaultButton(QMessageBox.StandardButton.Ok)
+
+        #Set the icon type (warning icon)
+        self.setIcon(QMessageBox.Icon.Warning)
+
+        #Show the message box (blocking)
+        self.exec()
+
+
 class FileDropLineEdit(QLineEdit):
     fileDropped = pyqtSignal(str)   #Signal emitted when a file is dropped
     def __init__(self):
         super().__init__()
 
         self.setAcceptDrops(True)   #Allows drag and drop on the widget
-
+        self.textChanged.connect(self.checkText)
 
     def dragEnterEvent(self, event):
         mime = event.mimeData()
@@ -66,28 +90,28 @@ class FileDropLineEdit(QLineEdit):
 
         event.ignore()   #Reject invalid drops
 
+    def setText(self, a0):
 
-class MessageBox(QMessageBox):
-    def __init__(self, Name: str, Message: str):
-        super().__init__()
+        message = None
 
-        #Set the main message text
-        self.setText(Message)
+        if a0 == "":
+            return super().setText(a0)
 
-        #Set the window title (top bar)
-        self.setWindowTitle(Name)
+        if os.path.exists(a0):
+            return super().setText(a0)
+        else:
+            message = MessageBox("Path error!", "That path doesn't exist!")
 
-        #Set the available buttons (only OK)
-        self.setStandardButtons(QMessageBox.StandardButton.Ok)
+    def text(self):
 
-        #Set default button
-        self.setDefaultButton(QMessageBox.StandardButton.Ok)
-
-        #Set the icon type (warning icon)
-        self.setIcon(QMessageBox.Icon.Warning)
-
-        #Show the message box (blocking)
-        self.exec()
+        if os.path.exists(super().text()):
+            return super().text()
+        else:
+            return ""
+        
+    
+    def checkText(self):
+        self.setText(self.text())
 
 
 class RecordingWorker(QObject):
@@ -470,7 +494,7 @@ class basicWindowWidget(QWidget):
 
         #Video path
         self.pathInput = FileDropLineEdit()
-        self.pathInput.setPlaceholderText("Video path...")
+        self.pathInput.setPlaceholderText("Path to the file...")
         self.pathInput.textChanged.connect(self.updateFilePath)
         self.pathInput.fileDropped.connect(self.updateFilePath)
 
@@ -505,9 +529,6 @@ class basicWindowWidget(QWidget):
             return
 
         self.setPathOptions(self.isLiveCheckbox.isChecked())
-        if not checkPath(self.path):
-            MessageBox("Path Error!", "The path is empty and needs a file!")
-            return
 
         self.thread = QThread()
         self.worker = self.workerClass(self.path, self.isLive)
@@ -627,19 +648,9 @@ class basicWindowWidget(QWidget):
             raise ValueError(f"Unknown backend: {backend}")
 
 
-    def getVideoDevicesCV2(self, max_devices: int = 5):
-        devices = []
-
-        for i in range(max_devices):
-            cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                devices.append({
-                    "id": i,
-                    "name": f"Camera {i}"
-                })
-                cap.release()
-
-        return devices
+    def getVideoDevicesCV2(self):
+        devices = FilterGraph().get_input_devices()
+        return [{"id": i, "name": name} for i, name in enumerate(devices)]
     
 
     def getAudioDevicesPyAudio(self):
@@ -693,12 +704,4 @@ class basicWindowWidget(QWidget):
         self.worker = None
         self.thread = None
 
-
-
-@staticmethod
-def checkPath(path) -> bool:
-    bans = ['[', ']', '{', '}', '<', '>', '#']
-
-    return True
-    return (path != "" and Path.exists(Path(path)) and not any(char in path for char in bans)) if not str(path).isnumeric() else str(path).isnumeric()
          

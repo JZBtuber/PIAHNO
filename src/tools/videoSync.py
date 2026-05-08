@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QDialog, QFileDialog, QPushButton, QLabel,
-                             QVBoxLayout, QHBoxLayout, QGridLayout)
+                             QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy)
 from PyQt6.QtGui import QImage, QPixmap
-from src.gui.Core import FileDropLineEdit
+from src.gui.Core import FileDropLineEdit, Qt
 from src.tools.fileIO import setDelayForParent
 from src.tools.audioSync import getMidiNotes          # reuse existing MIDI parser
 import cv2
@@ -21,6 +21,8 @@ class VideoSync(QDialog):
         self.videoDelay = 0         # calculated offset (ms)
 
         self.setLayout(self._makeMainLayout())
+
+        
 
     # ------------------------------------------------------------------
     # UI construction
@@ -62,6 +64,13 @@ class VideoSync(QDialog):
 
         # Video preview label
         self.videoLabel = QLabel("")
+        self.videoLabel.setMaximumSize(800,800)
+        self.videoLabel.setMinimumSize(300,300)
+        self.videoLabel.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
 
         # Scrub buttons row
         scrubLayout = QHBoxLayout()
@@ -156,7 +165,7 @@ class VideoSync(QDialog):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
-        self.videoLabel.setPixmap(QPixmap.fromImage(qimg))
+        self.videoLabel.setPixmap(QPixmap.fromImage(qimg).scaled(self.videoLabel.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
     # ------------------------------------------------------------------
     # Landmark management

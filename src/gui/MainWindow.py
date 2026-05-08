@@ -42,18 +42,18 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(QSize(600, 400))
         self.showMaximized()
         
-        self.addBaseWidget()
         self.windowNumber = 0
         self.windows = [[WidgetData() for _ in range(4)] for _ in range(2)]
         self.clock = None
         self.localPath = workingPath
+        self.addBaseWidget()
 
     def addBaseWidget(self):
         self.fond = QWidget()
         self.fondLayout = QGridLayout()
         self.fondLayout.setSpacing(10)
         self.fond.setLayout(self.fondLayout)
-        self.dialog = WindowChoice(self)
+        self.dialog = WindowChoice(self, self.windows)
 
         self.addTopMenu()
         self.addMenuBar()
@@ -281,17 +281,22 @@ class topMenu(QToolBar):
 
 
 class WindowChoice(QDialog):
-    def __init__(self, MainWindow):
+    def __init__(self, MainWindow, windows = []):
         super().__init__()
         self.mainWindow = MainWindow
+
         vert = QVBoxLayout()
-        hor0 = QHBoxLayout()
+
+        self.hor0 = QGridLayout()
+        self.hor0.rowStretch(0)
+        self.hor0.columnStretch(0)
+
+        self.hor0.addWidget(QLabel("Remove a window:"), 0, 0)
+
         hor1 = QHBoxLayout()
-
-        removeWindowButton = QPushButton("Remove the window number:")
-        self.removeWindowSpinBox = QSpinBox()
-        removeWindowButton.clicked.connect(self.removeWindow)
-
+        self.buttons = []
+        self.windows = windows
+               
         addWindowButtonVideo = QPushButton("Add a Video Feed")
         addWindowButtonVideo.clicked.connect(self.setVideo)
         addWindowButtonVideo.clicked.connect(self.addWindow)
@@ -305,8 +310,6 @@ class WindowChoice(QDialog):
         addWindowButtonKeyFrames.clicked.connect(self.setKeyFrames)
         addWindowButtonKeyFrames.clicked.connect(self.addWindow)
 
-        hor0.addWidget(removeWindowButton)
-        hor0.addWidget(self.removeWindowSpinBox)
 
         hor1.addWidget(addWindowButtonVideo)
         hor1.addWidget(addWindowButtonAudio)
@@ -314,7 +317,7 @@ class WindowChoice(QDialog):
         hor1.addWidget(addWindowButtonKeyFrames)
         
 
-        vert.addLayout(hor0)
+        vert.addLayout(self.hor0)
         vert.addLayout(hor1)
         self.setLayout(vert)
         self.widget = None
@@ -336,9 +339,31 @@ class WindowChoice(QDialog):
         self.close()
 
 
-    def removeWindow(self):
-        self.mainWindow.removeWindow(self.removeWindowSpinBox.value())
+    def removeWindow(self, ID):
+        self.mainWindow.removeWindow(ID)
         self.close()
+
+    def exec(self):
+        for button in self.buttons:
+            self.hor0.removeWidget(button)
+            button.setParent(None)
+            button.deleteLater()
+
+        self.buttons = []
+
+        for row in self.windows:
+            for window in row:
+                if isinstance(window, WidgetData):
+                    if isinstance(window.widget, (VideoFeed, AudioFeed, MidiFeed, KeyFeed)):
+                        id = window.getID()
+                        button = QPushButton(f"{id}")
+                        button.setMaximumSize(20, 20)
+                        button.clicked.connect(lambda checked = False, id=id: self.removeWindow(id))
+                        self.hor0.addWidget(button, 0 if id < 5 else 1, ((id - 1) % 4) + 1)
+
+                        self.buttons.append(button)
+            
+        super().exec()
 
     
 

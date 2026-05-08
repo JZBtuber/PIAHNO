@@ -46,7 +46,7 @@ class VideoWorker(basicWorker):
             path = self.path
 
         if not self.useDepthCamera:
-            self.capture = cv2.VideoCapture(path)
+            self.capture = cv2.VideoCapture(path, cv2.CAP_DSHOW)
 
             src_fps = self.capture.get(cv2.CAP_PROP_FPS)
             self.src_fps   = src_fps if src_fps > 0 else 30.0
