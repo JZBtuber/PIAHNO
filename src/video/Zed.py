@@ -7,6 +7,7 @@ class Zed():
     def __init__(self, filePath, live):
         
         self.InputType = sl.InputType()
+        self.fps = 30
 
         if live:
             self.svoMode = False
@@ -18,7 +19,7 @@ class Zed():
         
         self.init_params = sl.InitParameters(input_t=self.InputType)
         self.init_params.camera_resolution = sl.RESOLUTION.HD720
-        self.init_params.camera_fps = 30
+        self.init_params.camera_fps = self.fps
         self.init_params.depth_mode = sl.DEPTH_MODE.NEURAL
         self.init_params.coordinate_units = sl.UNIT.METER
         self.init_params.depth_minimum_distance = 0.3
@@ -173,5 +174,5 @@ class Zed():
                 "confidence_threshold": int(self.runtime_parameters.confidence_threshold)
             },
 
-            "fps": float(self.getFps())
+            "fps": float(self.fps)
         }

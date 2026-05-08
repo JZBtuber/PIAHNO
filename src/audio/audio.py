@@ -32,6 +32,7 @@ class AudioWorker(basicWorker):
         self.sample_width = None
         self.channels = 1
         self.rate = 44100
+        self.recordSelf = True
 
     def beforeLoop(self):
         self.p = pyaudio.PyAudio()

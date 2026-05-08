@@ -90,9 +90,40 @@ class MessageBox(QMessageBox):
         self.exec()
 
 
+class RecordingWorker(QObject):
+    finished = pyqtSignal()
+    def __init__(self, initFunc, recordFunc, stopFunc):
+        super().__init__()
+        self.initFunc = initFunc
+        self.recordFunc = recordFunc
+        self.stopFunc = stopFunc
+        self.running = False
+
+    @pyqtSlot()
+    def run(self):
+        self.running = True
+
+        try:
+            self.initFunc()
+
+            while self.running:
+                self.recordFunc()
+                QThread.msleep(1)
+
+        finally:
+            self.stopFunc()
+            self.finished.emit()
+
+    @pyqtSlot()
+    def stop(self):
+        self.running = False
+
+
 class basicWorker(QObject):
     finished = pyqtSignal()
     ready = pyqtSignal(int)
+
+    stopRecord = pyqtSignal()
 
     def __init__(self, path, isLive, delay = 0):
         super().__init__()
@@ -112,6 +143,10 @@ class basicWorker(QObject):
 
         self.masterClock = None
         self.localStartTime = None
+        self.recorder = None
+        self.recordThread = None
+        self.recordStopping = False
+        self.recordSelf = False
 
 
     def run(self):
@@ -140,7 +175,10 @@ class basicWorker(QObject):
                 self.loop()
 
                 if self.record or self.isRecording:
-                    self.recordSetUp()
+                    if self.recordSelf:
+                        self.selfRecordSetup()
+                    else:
+                        self._recordSetUp()
 
         except Exception as e:
             print(f"{type(self).__name__} crashed: {e}")
@@ -165,16 +203,53 @@ class basicWorker(QObject):
         print("After the loop")
 
     
-    def recordSetUp(self):
-        if not self.isRecording:
+    def selfRecordSetup(self):
+        if self.record and not self.isRecording:
             self.initRecording()
             self.isRecording = True
 
-        self.recordloop()
+        if self.record and self.isRecording:
+            self.recordloop()
 
-        if not self.record:
+        if not self.record and self.isRecording:
             self.stopRecording()
             self.isRecording = False
+
+
+    def _recordSetUp(self):
+        if self.record and not self.isRecording:
+            self.recorder = RecordingWorker(
+                self.initRecording,
+                self.recordloop,
+                self.stopRecording
+            )
+
+            self.recordThread = QThread()
+            self.recorder.moveToThread(self.recordThread)
+
+            self.recordThread.started.connect(self.recorder.run)
+
+            self.recorder.finished.connect(self.recordThread.quit)
+            self.recorder.finished.connect(self.recorder.deleteLater)
+            self.recordThread.finished.connect(self.recordThread.deleteLater)
+            self.recordThread.finished.connect(self._recordThreadFinished)
+
+            self.recordThread.start()
+            self.isRecording = True
+
+        elif not self.record and self.isRecording and not self.recordStopping:
+            self.recordStopping = True
+
+            if self.recorder is not None:
+                self.recorder.stop()
+
+
+    def _recordThreadFinished(self):
+        self.recorder = None
+        self.recordThread = None
+        self.isRecording = False
+        self.recordStopping = False
+
             
 
     
@@ -197,9 +272,19 @@ class basicWorker(QObject):
             self.paused = not self.paused
 
 
+
     @pyqtSlot()
     def stop(self):
-            self.running = False
+        self.running = False
+        self.record = False
+
+        if self.recordSelf:
+            if self.isRecording:
+                self.stopRecording()
+                self.isRecording = False
+
+        elif self.recorder is not None:
+            self.recorder.stop()
 
 
     @pyqtSlot(bool)

@@ -27,6 +27,8 @@ class VideoWorker(basicWorker):
         self.algorithm         = mediaWork()
         self.useDepthCamera    = False
         self.Zed               = None
+        self.videoFrame        = None
+        self.lastFrame         = np.empty([])
 
         
 
@@ -47,7 +49,9 @@ class VideoWorker(basicWorker):
             self.capture = cv2.VideoCapture(path)
 
             src_fps = self.capture.get(cv2.CAP_PROP_FPS)
-            self.src_fps   = src_fps if src_fps > 0 else 60.0
+            self.src_fps   = src_fps if src_fps > 0 else 30.0
+            self.fpsReady.emit(self.src_fps)
+
             self.target_dt = 1.0 / self.src_fps
 
             self.prevTime    = time.perf_counter()
@@ -236,7 +240,17 @@ class VideoWorker(basicWorker):
     def recordloop(self):
         t = time.perf_counter() - self.recordStarTime
 
-        self.recordedFrames.append((t, self.videoFrame.copy()))
+        
+        if self.lastFrame.size == 0:
+            self.recordedFrames.append((t, self.videoFrame.copy()))
+        elif not np.array_equal(self.videoFrame, self.lastFrame):
+                self.recordedFrames.append((t, self.videoFrame.copy()))
+
+
+        self.lastFrame = self.videoFrame.copy()
+
+        
+        
 
         if self.useDepthCamera and self.Zed is not None:
             if self.Zed.point_cloud_img is not None:
@@ -251,8 +265,10 @@ class VideoWorker(basicWorker):
 
         duration = self.recordedFrames[-1][0] - self.recordedFrames[0][0]
         frame_count = len(self.recordedFrames)
+        real_fps = frame_count / duration if duration > 0 else self.src_fps
 
-        real_fps = frame_count / duration if duration > 0 else 30.0
+        # Clamp to the original source FPS so the file plays back at the right speed
+        real_fps = real_fps
 
         height, width = self.recordedFrames[0][1].shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
