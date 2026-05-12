@@ -8,9 +8,9 @@ from src.video.Zed import Zed
 import numpy as np
 import time
 import os
+import sys
 from src.gui.Core import *
 from datetime import datetime
-from pathlib import Path
 
 
 class VideoWorker(basicWorker):
@@ -29,10 +29,8 @@ class VideoWorker(basicWorker):
         self.Zed               = None
         self.videoFrame        = None
         self.lastFrame         = np.empty([])
-
+        self.hasDepthCamera    = False
         
-
-
     # ------------------------------------------------------------------
     # Worker lifecycle
     # ------------------------------------------------------------------
@@ -61,7 +59,11 @@ class VideoWorker(basicWorker):
                 self.event_index = 0
 
         else:
-                self.Zed = Zed(path, self.isLive)
+                try:
+                    self.Zed = Zed(path, self.isLive)
+                except:
+                    self.finished.emit()
+                    return
 
                 src_fps = self.Zed.getFps()
                 self.src_fps   = src_fps if src_fps > 0 else 30
@@ -112,10 +114,8 @@ class VideoWorker(basicWorker):
 
 
     def _loop_file(self):
-        print("loop file")
         if self.event_index >= len(self.events):
             self.running = False
-            self.finished.emit()
             return
 
         nowMs = self.getMasterTimeMs()
@@ -125,7 +125,9 @@ class VideoWorker(basicWorker):
 
             if frameTimeMs > nowMs:
                 break
-            
+
+            # Seek to the exact frame by timestamp instead of reading blindly
+            self.capture.set(cv2.CAP_PROP_POS_MSEC, frameTimeMs)
             ret, frame = self.capture.read()
 
             if not ret:
@@ -187,12 +189,11 @@ class VideoWorker(basicWorker):
     def _pace(self, loop_start: float):
         """Busy-wait until at least one frame-period has elapsed (live only)."""
         target = loop_start + self.target_dt
-        while True:
-            remaining = target - time.perf_counter()
-            if remaining <= 0:
-                break
-            if remaining > 0.002:
-                time.sleep(remaining - 0.001)
+        remaining = target - time.perf_counter()
+        if remaining > 0.0005:                          # sleep off the bulk
+            QThread.usleep(int((remaining - 0.0005) * 1_000_000))
+        while time.perf_counter() < target:             # tiny spin: < 0.5ms, negligible GIL pressure
+            pass
 
     def _update_fps(self):
         now = time.perf_counter()
@@ -242,11 +243,7 @@ class VideoWorker(basicWorker):
         elif not np.array_equal(self.videoFrame, self.lastFrame):
                 self.recordedFrames.append((t, self.videoFrame.copy()))
 
-
         self.lastFrame = self.videoFrame.copy()
-
-        
-        
 
         if self.useDepthCamera and self.Zed is not None:
             if self.Zed.point_cloud_img is not None:
@@ -336,6 +333,17 @@ class VideoFeed(basicWindowWidget):
 
         self.makeBasicWidget()
 
+        self.lockNotDepth      = False
+
+        try:
+            import pyzed
+        except:
+            self.lockNotDepth = True
+        
+        if not self.lockNotDepth:
+            del sys.modules["pyzed"]
+
+
     def updateCameraNumber(self, n):
         self.cameraNumber = n
 
@@ -351,7 +359,7 @@ class VideoFeed(basicWindowWidget):
         pixmap = QPixmap.fromImage(image)
         scaled = pixmap.scaled(self.mainWidget.size(),
                                Qt.AspectRatioMode.KeepAspectRatio,
-                               Qt.TransformationMode.SmoothTransformation)
+                               Qt.TransformationMode.FastTransformation)
         self.mainWidget.setPixmap(scaled)
         self.mainWidget.update()
 
@@ -365,7 +373,7 @@ class VideoFeed(basicWindowWidget):
     def setIsLive(self, s):
         super().setIsLive(s)
 
-        if not s:
+        if not s and not self.lockNotDepth:
             self.depthCamera.setChecked(False)
 
         self.depthCamera.setEnabled(s)

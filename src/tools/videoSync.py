@@ -191,7 +191,16 @@ class VideoSync(QDialog):
             self.delayLabel.setText("Delay: no MIDI notes found!")
             return
         
+        if not self.pathToVideo:
+            self.delayLabel.setText("Delay: no Video file selected!")
+            return
+        
         delay = 0
+
+        if self.notes == []:
+            self.delayLabel.setText("Delay: no notes set!")
+            return
+        
         
         for i, note in enumerate(self.notes):
             delay += midiNotes[i]["timeMs"] - note["timeMs"]

@@ -2,50 +2,49 @@ import json
 import os
 
 
-@staticmethod
 def getDelayFromParent(filePath: str, parentPath: str, workingPath: str) -> int:
-
     if not os.path.exists(filePath) or not os.path.exists(parentPath):
         return 0
-    
-    if not os.path.exists(f"{workingPath}\data\ParentDelays.json"):
+
+    delayPath = os.path.join(os.getcwd(), "data", "ParentDelays.json")
+
+    if not os.path.exists(delayPath):
         return 0
 
-    with open(f"{workingPath}\data\ParentDelays.json", "r") as file:
-        jsonObject = json.loads(file.read())
-        
-        print(filePath)
-        print(parentPath)
-
-        if filePath in jsonObject["files"]:
-            if parentPath in jsonObject["files"][filePath]:
-                return jsonObject["files"][filePath][parentPath]
+    try:
+        with open(delayPath, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    except (json.JSONDecodeError, OSError):
         return 0
-    
-@staticmethod
-def setDelayForParent(filePath:str, parentPath:str, workingPath:str, delay: int):
 
-    data = []
+    return data.get("files", {}).get(filePath, {}).get(parentPath, 0)
 
+
+def setDelayForParent(filePath: str, parentPath: str, workingPath: str, delay: int):
     if not os.path.exists(filePath) or not os.path.exists(parentPath):
-        return 
-    
-    if not os.path.exists(f"{workingPath}\data"):
-        os.makedirs(f"{workingPath}\data")
-    
-    with open(f"{workingPath}\data\ParentDelays.json", "r") as file:
-        data = json.loads(file.read())
+        return
 
-    if filePath in data["files"]:
-        if parentPath in data["files"][filePath]:
-            data["files"][filePath][parentPath] = delay
+    dataDir = os.path.join(os.getcwd(), "data")
+    delayPath = os.path.join(dataDir, "ParentDelays.json")
 
-        else:
-            data["files"][filePath][parentPath] = delay
+    os.makedirs(dataDir, exist_ok=True)
 
-    else:
-        data["files"][filePath] = {parentPath : delay}
+    data = {"files": {}}
 
+    if os.path.exists(delayPath):
+        try:
+            with open(delayPath, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        except (json.JSONDecodeError, OSError):
+            data = {"files": {}}
 
-    with open(f"{workingPath}\data\ParentDelays.json", "w") as file:
+    if "files" not in data:
+        data["files"] = {}
+
+    if filePath not in data["files"]:
+        data["files"][filePath] = {}
+
+    data["files"][filePath][parentPath] = delay
+
+    with open(delayPath, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4, ensure_ascii=False)

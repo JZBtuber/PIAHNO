@@ -8,36 +8,34 @@ import os
 import time
 
 
-class MessageBox(QMessageBox):
+class MessageBox(QMessageBox): #Error message box to communicate with the user.
     def __init__(self, Name: str, Message: str):
         super().__init__()
-
-        #Set the main message text
-        self.setText(Message)
-
-        #Set the window title (top bar)
-        self.setWindowTitle(Name)
-
+        
+        self.setWindowTitle(Name)   #Set the window title (top bar)
+        self.setText(Message)       #Set the main message text
+        
         #Set the available buttons (only OK)
         self.setStandardButtons(QMessageBox.StandardButton.Ok)
-
-        #Set default button
         self.setDefaultButton(QMessageBox.StandardButton.Ok)
 
-        #Set the icon type (warning icon)
-        self.setIcon(QMessageBox.Icon.Warning)
-
-        #Show the message box (blocking)
-        self.exec()
+        self.setIcon(QMessageBox.Icon.Warning) #Set the icon type
+        
+        self.exec() #Enable the message box
 
 
 class FileDropLineEdit(QLineEdit):
     fileDropped = pyqtSignal(str)   #Signal emitted when a file is dropped
+
     def __init__(self):
         super().__init__()
 
         self.setAcceptDrops(True)   #Allows drag and drop on the widget
-        self.textChanged.connect(self.checkText)
+        self.textChanged.connect(lambda x: self.setText(self.text()))
+
+    #-----------------------------------------------------------
+    #Events to drag and drop files
+    #-----------------------------------------------------------
 
     def dragEnterEvent(self, event):
         mime = event.mimeData()
@@ -85,6 +83,10 @@ class FileDropLineEdit(QLineEdit):
 
         event.ignore()   #Reject invalid drops
 
+    #------------------------------------------------------------
+    #Functions to change the text with path verification
+    #------------------------------------------------------------
+
     def setText(self, a0):
 
         message = None
@@ -98,30 +100,31 @@ class FileDropLineEdit(QLineEdit):
             message = MessageBox("Path error!", "That path doesn't exist!")
 
     def text(self):
-
         if os.path.exists(super().text()):
             return super().text()
         else:
             return ""
-        
-    
-    def checkText(self):
-        self.setText(self.text())
 
 
 class RecordingWorker(QObject):
     finished = pyqtSignal()
     def __init__(self, initFunc, recordFunc, stopFunc):
         super().__init__()
+
+        # Taking the functions defined in the different 
+        # feeds and using the in the right order
         self.initFunc = initFunc
         self.recordFunc = recordFunc
         self.stopFunc = stopFunc
+
         self.running = False
+
 
     @pyqtSlot()
     def run(self):
         self.running = True
 
+        #Basic recording loop with init and closing
         try:
             self.initFunc()
 
@@ -141,8 +144,9 @@ class RecordingWorker(QObject):
 class basicWorker(QObject):
     finished = pyqtSignal()
     ready = pyqtSignal(int)
-
     stopRecord = pyqtSignal()
+    pathError = pyqtSignal()
+
 
     def __init__(self, path, isLive, delay = 0):
         super().__init__()
@@ -159,7 +163,6 @@ class basicWorker(QObject):
         self.delay = delay
         self.delayed = False
         self.released = False
-
         self.masterClock = None
         self.localStartTime = None
         self.recorder = None
@@ -170,73 +173,98 @@ class basicWorker(QObject):
 
     def run(self):
         self.running = True
-        try:
 
+        #Workers default cycle with error managment
+        try:
+            #Send an error if the path is empty
             if not self.isLive and self.path == "":
                 self.running = False
-                self.finished.emit()
+                self.pathError.emit()
                 return
 
+            #Initialise the feed
             self.beforeLoop()
             self.ready.emit(self.ID)
 
+            #Delay management
             while self.running and self.delayed:
                 if self.masterClock is not None and self.ID in self.masterClock.released_ids:
                     self.delay = self.masterClock.released_ids[self.ID]
                     break
                 QThread.msleep(1)
-
             if self.delay > 0:
                 QThread.msleep(self.delay)
-
             self.localStartTime = time.perf_counter()
 
+            #Main loop
             while self.running:
-
+                
+                #Pause
                 if self.paused:
                     QThread.msleep(50)
                     continue
-
+                
+                #Loop function
                 self.loop()
 
+                #Recording managment
                 if self.record or self.isRecording:
                     if self.recordSelf:
                         self.selfRecordSetup()
                     else:
                         self._recordSetUp()
 
-        except Exception as e:
+        except Exception as e: #Execption managment
             print(f"{type(self).__name__} crashed: {e}")
 
         finally:
-            try:
+            try: #Kills the sub processes
                 self.afterLoop()
             except Exception as e:
                 print(f"{type(self).__name__} crashed: {e}")
             finally:
                 self.finished.emit()
 
-
+    #-----------------------------------------------------------
+    #Placeholder functions to be filled by the feeds
+    #-----------------------------------------------------------
 
     def beforeLoop(self):
         print("Before the loop")
     
+
     def loop(self):
         print("Looping")
+
 
     def afterLoop(self):
         print("After the loop")
 
-    
+
+    def initRecording(self):
+        print("Initiatiing Recording")
+
+
+    def stopRecording(self):
+        print("Stop recording")
+
+
+    def recordloop(self):
+        print("Recording")
+
+    #--------------------------------------------------------
+    #Recording functions
+    #--------------------------------------------------------
+
     def selfRecordSetup(self):
-        if self.record and not self.isRecording:
+        if self.record and not self.isRecording: #Init
             self.initRecording()
             self.isRecording = True
 
-        if self.record and self.isRecording:
+        if self.record and self.isRecording: #Loop
             self.recordloop()
 
-        if not self.record and self.isRecording:
+        if not self.record and self.isRecording: #Closing/stop
             self.stopRecording()
             self.isRecording = False
 
@@ -258,6 +286,8 @@ class basicWorker(QObject):
             self.recorder.finished.connect(self.recorder.deleteLater)
             self.recordThread.finished.connect(self.recordThread.deleteLater)
             self.recordThread.finished.connect(self._recordThreadFinished)
+            
+            self.stopRecord.connect(self.recorder.stop, Qt.ConnectionType.DirectConnection)
 
             self.recordThread.start()
             self.isRecording = True
@@ -266,7 +296,7 @@ class basicWorker(QObject):
             self.recordStopping = True
 
             if self.recorder is not None:
-                self.recorder.stop()
+                self.stopRecord.emit()
 
 
     def _recordThreadFinished(self):
@@ -275,27 +305,12 @@ class basicWorker(QObject):
         self.isRecording = False
         self.recordStopping = False
 
-            
-
-    
-    def initRecording(self):
-        print("Initiatiing Recording")
-
-
-    def stopRecording(self):
-        print("Stop recording")
-
-
-    def recordloop(self):
-        print("Recording")
-
     def setID(self, ID: int = 0):
         self.ID = ID
 
     @pyqtSlot()
     def pause(self):
             self.paused = not self.paused
-
 
 
     @pyqtSlot()
@@ -309,7 +324,7 @@ class basicWorker(QObject):
                 self.isRecording = False
 
         elif self.recorder is not None:
-            self.recorder.stop()
+            self.stopRecord.emit()
 
 
     @pyqtSlot(bool)
@@ -340,6 +355,7 @@ class basicWorker(QObject):
 
 class basicWindowWidget(QWidget):
     mute = pyqtSignal(bool)
+    stopWorker = pyqtSignal()
 
     def __init__(self, workerClass, ID: int = 0, hasAudio = False, workingDir: str = ""):
         super().__init__()
@@ -415,7 +431,7 @@ class basicWindowWidget(QWidget):
     def makeBasicWidget(self):
 
         #ID number
-        IDLabel = QLabel(f"ID: {self.ID}")
+        IDLabel = QLabel(f"{type(self).__name__}   ID: {self.ID}")
 
         #SyncParent
         self.parentComboBox = QComboBox()
@@ -542,7 +558,16 @@ class basicWindowWidget(QWidget):
 
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
+
+        self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.onWorkerFinished)
+
+        self.stopWorker.connect(self.worker.stop, Qt.ConnectionType.DirectConnection)
+        
+        self.worker.pathError.connect(
+            self.showPathError,
+            Qt.ConnectionType.QueuedConnection
+            )
 
         if masterClock is not None:
             self.worker.ready.connect(masterClock.setReady)
@@ -555,7 +580,6 @@ class basicWindowWidget(QWidget):
         self.thread.finished.connect(self.onThreadFinished)
 
         self.thread.start()
-        print("thread started")
 
 
     def pause(self):
@@ -589,17 +613,7 @@ class basicWindowWidget(QWidget):
         self.pauseButton.setChecked(False)
 
         if self.worker is not None:
-            try:
-                self.worker.stop()
-            except Exception:
-                pass
-            finally:
-                self.worker = None
-        
-        if self.thread is not None:
-            self.thread.quit()
-            self.thread.wait()
-            self.thread = None
+            self.stopWorker.emit()
 
     def mute(self, s):
         if self.worker is not None:
@@ -722,5 +736,10 @@ class basicWindowWidget(QWidget):
         self.startButton.setChecked(False)
         self.worker = None
         self.thread = None
+
+    
+    @pyqtSlot()
+    def showPathError(self):
+        MessageBox("Path error!", "The path doesn't exist / is empty!")
 
          

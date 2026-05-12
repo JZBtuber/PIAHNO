@@ -9,7 +9,7 @@ import faulthandler
 # This is the main .py file of the app.
 #----------------------------------------------------------------#
 
-def main():
+def main(): #Main App
     faulthandler.enable()
     localPath = os.path.dirname(os.path.realpath(__file__))
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -17,5 +17,5 @@ def main():
     app = Application(localPath)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  #Do not run as module
     main()

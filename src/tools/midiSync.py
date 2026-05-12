@@ -78,6 +78,9 @@ class MidiSync(QDialog):
 
     def calculateDelay(self):
 
+        if self.audioInput.text() == "" or self.midiInput.text() == "":
+            return
+
         audioPeaks = getAudioPeaks(self.audioInput.text())
         midiNotes = getMidiNotes(self.midiInput.text())
 
@@ -110,6 +113,7 @@ class MidiSync(QDialog):
                     self.midiDelay = int(candidateDelay)
 
         self.delayLabel.setText(f"Delay: {float(self.midiDelay) / 1000}s")
+
 
 
     def saveDelay(self):

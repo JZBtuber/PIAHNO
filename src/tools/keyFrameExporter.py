@@ -75,7 +75,8 @@ class KeyFrameWorker(QObject):
         if self.pathToPoint != "" and os.path.exists(self.pathToPoint):
             loaded = np.load(self.pathToPoint, allow_pickle=False)
             pointData = loaded[loaded.files[0]]
-
+        else:
+            pointData = None
 
         while framesDone < frameNumber and capture.isOpened():
 
@@ -85,12 +86,12 @@ class KeyFrameWorker(QObject):
 
             timestamp_ms = int(framesDone * 1000 / fps)
 
-            currentPcl = pointData[framesDone] if framesDone < len(pointData) else None
+            if pointData:
+                currentPcl = pointData[framesDone] if framesDone < len(pointData) else None
+            else:
+                currentPcl = None
 
-            data = self.algorithm.get3dpoints(frame, 
-                                              fps, 
-                                              currentPcl if currentPcl is not None else None,
-                                              self.cameraParameters if self.cameraParameters is not None else None)
+            data = self.algorithm.get3dpoints(frame, fps, currentPcl if currentPcl is not None else None, self.cameraParameters if self.cameraParameters is not None else None)
 
             leftHand, rightHand = data
 

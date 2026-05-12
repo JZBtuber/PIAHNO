@@ -1,34 +1,34 @@
 import mediapipe as mp
-import pyzed.sl as sl
 import numpy as np
 import json
 
 class Zed():
     def __init__(self, filePath, live):
+
+        try:
+            import pyzed.sl as sl
+        except ImportError:
+            raise RuntimeError("ZED SDK is not installed on this machine.")
         
         self.InputType = sl.InputType()
         self.fps = 30
 
         if live:
             self.svoMode = False
-        else:
-            self.InputType.set_from_svo_file(filePath)
-            self.svoMode = True
         
         self.zed = sl.Camera()
         
         self.init_params = sl.InitParameters(input_t=self.InputType)
         self.init_params.camera_resolution = sl.RESOLUTION.HD1080
         self.init_params.camera_fps = self.fps
-        self.init_params.depth_mode = sl.DEPTH_MODE.NEURAL
+        self.init_params.depth_mode = sl.DEPTH_MODE.NEURAL_LIGHT
         self.init_params.coordinate_units = sl.UNIT.METER
-        self.init_params.depth_minimum_distance = 0.3
+        self.init_params.depth_minimum_distance = 0.6
         self.init_params.depth_maximum_distance = 1.0
 
         err = self.zed.open(self.init_params)
         if err != sl.ERROR_CODE.SUCCESS :
             print(repr(err))
-            print("If using SVO, check if the path is correct")
             self.zed.close()
             exit(1)
 
@@ -69,14 +69,10 @@ class Zed():
             return False, None
 
         self.zed.retrieve_image(self.image, sl.VIEW.LEFT)
-        self.zed.retrieve_measure(self.depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
         self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZ, sl.MEM.CPU)
-        self.zed.retrieve_measure(self.confidence_map, sl.MEASURE.CONFIDENCE, sl.MEM.CPU)
 
         self.img = self.image.get_data()
-        self.depth_img = self.depth.get_data()
         self.point_cloud_img = self.point_cloud.get_data()
-        self.confidence_img = self.confidence_map.get_data()
 
         return True, self.img
 
