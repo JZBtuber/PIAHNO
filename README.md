@@ -1,8 +1,8 @@
-# PIAHNO – Data Colector
+# PIAHNO – Data Collector
 
 ## Overview
 
-**Data Colector** is a desktop application developed for the **PIAHNO** project in the **S2M Laboratory** by **Justin Boileau** under the **Université de Montréal**.
+**Data Collector** is a desktop application developed for the **PIAHNO** project in the **S2M Laboratory** by **Justin Boileau** under the **Université de Montréal**.
 
 Its purpose is to help **objectively analyze piano performances** by displaying and recording multiple observation feeds in the same workspace.
 
