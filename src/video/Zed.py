@@ -1,15 +1,13 @@
-import mediapipe as mp
 import numpy as np
+from src.tools.setting import GlobalSettings
 import json
+try:
+    import pyzed.sl as sl
+except:
+    ""
 
 class Zed():
     def __init__(self, filePath, live):
-
-        try:
-            import pyzed.sl as sl
-        except ImportError:
-            raise RuntimeError("ZED SDK is not installed on this machine.")
-        
         self.InputType = sl.InputType()
         self.fps = 30
 
@@ -17,14 +15,35 @@ class Zed():
             self.svoMode = False
         
         self.zed = sl.Camera()
+
+        
+        if GlobalSettings["zedResolution"] == "VGA":
+            resolution = sl.RESOLUTION.VGA
+        elif GlobalSettings["zedResolution"] == "HD720":
+            resolution = sl.RESOLUTION.HD720
+        elif GlobalSettings["zedResolution"] == "HD1080":
+            resolution = sl.RESOLUTION.HD1080
+        elif GlobalSettings["zedResolution"] == "HD2K":
+            resolution = sl.RESOLUTION.HD2K
+        else:
+            resolution = sl.RESOLUTION.HD1080
+        
+        if GlobalSettings["zedMode"] == "Neural_Light":
+            mode = sl.DEPTH_MODE.NEURAL_LIGHT
+        elif GlobalSettings["zedMode"] == "Neural":
+            mode = sl.DEPTH_MODE.NEURAL
+        elif GlobalSettings["zedMode"] == "Neural_Complete":
+            mode = sl.DEPTH_MODE.NEURAL_PLUS
+        else:
+            mode = sl.DEPTH_MODE.NEURAL_LIGHT
         
         self.init_params = sl.InitParameters(input_t=self.InputType)
-        self.init_params.camera_resolution = sl.RESOLUTION.HD1080
-        self.init_params.camera_fps = self.fps
-        self.init_params.depth_mode = sl.DEPTH_MODE.NEURAL_LIGHT
+        self.init_params.camera_resolution = resolution
+        self.init_params.camera_fps = GlobalSettings["zedFps"]
+        self.init_params.depth_mode = mode
         self.init_params.coordinate_units = sl.UNIT.METER
-        self.init_params.depth_minimum_distance = 0.6
-        self.init_params.depth_maximum_distance = 1.0
+        self.init_params.depth_minimum_distance = GlobalSettings["zedDepthMin"]
+        self.init_params.depth_maximum_distance = GlobalSettings["zedDepthMax"]
 
         err = self.zed.open(self.init_params)
         if err != sl.ERROR_CODE.SUCCESS :

@@ -2,25 +2,30 @@ import cv2
 import os
 import numpy as np
 import mediapipe as mp
+from src.tools.setting import GlobalSettings
 
 
 
 class mediaWork():
-    def __init__(self, maxHands = 2, detectionConfidence = 0.90, trackingConfidence = 0.90):
+    def __init__(self):
         
         baseOptions = mp.tasks.BaseOptions
         handLandmarker = mp.tasks.vision.HandLandmarker
         handLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
         visionRunningMode = mp.tasks.vision.RunningMode
+
+        detectionConfidence = GlobalSettings["detectionConfidence"]
+        presenceConfidence = GlobalSettings["presenceConfidence"]
+        trackingConfidence = GlobalSettings["trackingConfidence"]
         
         model_path = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
         
         options = handLandmarkerOptions(
             base_options=baseOptions(model_asset_path=model_path),
             running_mode=visionRunningMode.VIDEO,
-            num_hands=maxHands,
+            num_hands=2,
             min_hand_detection_confidence=detectionConfidence,
-            min_hand_presence_confidence=0.90,
+            min_hand_presence_confidence=presenceConfidence,
             min_tracking_confidence=trackingConfidence
         )
 

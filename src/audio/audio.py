@@ -145,9 +145,7 @@ class AudioWorker(basicWorker):
         self.frames = [] #list for recording data
         
         #making the path for the files
-        time: str = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:19]
-        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{time}_Test"), exist_ok=True)
-        self.newPath = os.path.join(os.getcwd(), f"Tests\\{time}_Test\\Audio_{self.ID}.wav")
+        self.newPath = os.path.join(self.getRecordingPath(), f"Audio_{self.ID}.wav")
 
     
     def recordloop(self):

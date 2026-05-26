@@ -1,7 +1,9 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
-from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
+from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from src.tools.fileIO import *
 from pygrabber.dshow_graph import FilterGraph
+from datetime import datetime
+from src.tools.setting import GlobalSettings
 import pyaudio
 import mido
 import os
@@ -351,6 +353,17 @@ class basicWorker(QObject):
         if self.localStartTime is None:
             return 0
         return int((time.perf_counter() - self.localStartTime) * 1000)
+    
+    @staticmethod
+    def getRecordingPath() -> str:
+        """
+        Returns the path to the directory where the file should be saved.
+        """
+        timeString = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:19]
+        pathToFile = GlobalSettings["pathToWorkingDir"] if GlobalSettings["pathToWorkingDir"] else os.path.join(os.getcwd(), "Tests")
+        filepath = f"{GlobalSettings["participantName"]}\\{timeString}_Test" if GlobalSettings["participantName"] else f"{timeString}_Test"
+
+        return os.path.join(pathToFile, filepath)
 
 
 class basicWindowWidget(QWidget):

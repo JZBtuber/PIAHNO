@@ -6,16 +6,10 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout,
                              )
 from src.tools.mediapipe.algorithms import mediaWork
 
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
-
 import numpy as np
 import scipy.io
-from pathlib import Path
 import cv2
 import os
-import math
 
 from src.gui.Core import FileDropLineEdit, MessageBox
 

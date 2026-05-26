@@ -4,11 +4,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 from src.tools.mediapipe.algorithms import mediaWork
 import os
 import cv2
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
-import numpy as np
-from pathlib import Path
+
 
 class VideoWorker(QObject):
     frameCount = pyqtSignal(int)

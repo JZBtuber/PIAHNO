@@ -10,6 +10,10 @@ from src.tools.midiSync import MidiSync
 from src.tools.videoSync import VideoSync
 from src.tools.keyFrameExporter import KeyFrameExporter
 from src.video.keyFrames import KeyFeed
+from src.tools.fileIO import saveSettings,loadSettings
+from src.tools.setting import GlobalSettings
+import copy
+from os import path
 
 class WidgetData():
     def __init__(self, widget: QWidget = None, ID: int = 0):
@@ -48,6 +52,11 @@ class MainWindow(QMainWindow):
         self.localPath = workingPath
         self.addBaseWidget()
 
+        loadSettings()
+
+        self.settings = GlobalSettings
+        print(GlobalSettings)
+
     def addBaseWidget(self):
         self.fond = QWidget()
         self.fondLayout = QGridLayout()
@@ -71,7 +80,6 @@ class MainWindow(QMainWindow):
 
         self.quickAccess = [QAction("Add/Remove a window", self),
                             QAction("Remove All windows"),
-                            QAction("Save project", self),
                             QAction("Start", self),
                             QAction("Pause/Resume", self),
                             QAction("Stop",self),
@@ -80,27 +88,25 @@ class MainWindow(QMainWindow):
         
         self.quickAccess[0].setStatusTip("Add or remove an observation window")
         self.quickAccess[1].setStatusTip("Remove all observation windows")
-        self.quickAccess[2].setStatusTip("Save the current project setup")
-        self.quickAccess[3].setStatusTip("Start all video/audio")
-        self.quickAccess[4].setStatusTip("Pause and resume all video/audio")
-        self.quickAccess[5].setStatusTip("Stop all video/audio")
-        self.quickAccess[6].setStatusTip("Recording all windows")
+        self.quickAccess[2].setStatusTip("Start all video/audio")
+        self.quickAccess[3].setStatusTip("Pause and resume all video/audio")
+        self.quickAccess[4].setStatusTip("Stop all video/audio")
+        self.quickAccess[5].setStatusTip("Recording all windows")
 
         self.quickAccess[0].triggered.connect(self.dialog.exec)
         self.quickAccess[1].triggered.connect(self.removeAllWindow)
+        self.quickAccess[2].triggered.connect(self.startALL)
+        self.quickAccess[3].triggered.connect(self.pauseALL)
+        self.quickAccess[4].triggered.connect(self.stopALL)
+        self.quickAccess[5].triggered.connect(self.chooseRecording)
 
-        self.quickAccess[3].triggered.connect(self.startALL)
-        self.quickAccess[4].triggered.connect(self.pauseALL)
-        self.quickAccess[5].triggered.connect(self.stopALL)
-        self.quickAccess[6].triggered.connect(self.chooseRecording)
-
-        self.quickAccess[6].setCheckable(True)
+        self.quickAccess[5].setCheckable(True)
 
 
         self.toolbar.addActions(self.quickAccess)
 
         for i, action in enumerate(self.quickAccess):
-            if i == 3 or i == 6:
+            if i == 2 or i == 5:
                 self.toolbar.addSeparator()
             self.toolbar.addAction(action)
 
@@ -114,6 +120,7 @@ class MainWindow(QMainWindow):
         self.editOptions = [QAction("Settings", self),
                             QAction("Add and remove windows", self),
                             ]
+        self.editOptions[0].triggered.connect(self.setSettings)
         self.editOptions[1].triggered.connect(self.dialog.exec)
 
         self.toolOptions1 = [QAction("Sync Midi", self),
@@ -265,6 +272,12 @@ class MainWindow(QMainWindow):
         keyFrameLoader.exec()
         keyFrameLoader = None
 
+    
+    def setSettings(self):
+        settingbox = SettingBox(self.settings)
+        settingbox.exec()
+        settingbox = None
+
 
 class topMenu(QToolBar):
     def __init__(self):
@@ -369,3 +382,266 @@ class WindowChoice(QDialog):
                         self.buttons.append(button)
             
         super().exec()
+
+class SettingBox(QDialog):
+    def __init__(self, mainSettings):
+        super().__init__()
+        self.setFixedSize(1000, 800)
+
+        settings = copy.deepcopy(mainSettings)
+
+        closeButton = QPushButton("Save and close")
+        closeButton.clicked.connect(lambda : self.saveAndClose(settings, mainSettings))
+        closeButton.setMaximumSize(100, 40)
+
+        layout = QVBoxLayout()
+        
+        #Code name of the patient
+        nameInput = QLineEdit()
+        nameInput.setPlaceholderText("Code name")
+        nameInput.setText(settings["participantName"])
+        nameInput.textChanged.connect(lambda text: settings.__setitem__("participantName", text))
+        
+        layout.addLayout(self._addSetting("Code name of the test subject",
+                                         "Set the code name under which the recorded files will be saved",
+                                         nameInput), 0)
+        
+        #Path to the recording directory
+        self.dirInput = QLineEdit()
+        self.dirInput.setPlaceholderText("Path to the directory")
+        self.dirInput.setText(settings["pathToWorkingDir"])
+        self.dirInput.textChanged.connect(lambda text: settings.__setitem__("pathToWorkingDir", text))
+
+        browseButton = QPushButton("Browse")
+        browseButton.clicked.connect(self.findDir)
+
+        dirInputLayout = QHBoxLayout()
+        dirInputLayout.setContentsMargins(0, 0, 0, 0)
+        dirInputLayout.addWidget(self.dirInput, 0)
+        dirInputLayout.addWidget(browseButton, 0)
+        dirInputLayout.addStretch()
+
+        dirChoice = QWidget()
+        dirChoice.setLayout(dirInputLayout)
+        dirChoice.setMinimumSize(600, 40)
+
+        layout.addLayout(self._addSetting("Path to the save directory",
+                                         "Set the set the path to the directory where the different test subject files will be saved",
+                                         dirChoice), 0)
+        
+        #Choice of the detection confidence
+        detectionConfidence = QDoubleSpinBox()
+        detectionConfidence.setValue(settings["detectionConfidence"])
+        detectionConfidence.setMaximum(1.0)
+        detectionConfidence.setMinimum(0.0)
+        detectionConfidence.setDecimals(2)
+        detectionConfidence.setSingleStep(0.05)
+        detectionConfidence.valueChanged.connect(lambda value: settings.__setitem__("detectionConfidence", value))
+        
+        layout.addLayout(self._addSetting("Detection Confidence for the algorithm",
+                                         "Set the detection confidence score requiered for the palm detection model to identify a hand",
+                                         detectionConfidence), 0)
+
+        #Choice of the tracking confidence
+        trackingConfidence = QDoubleSpinBox()
+        trackingConfidence.setValue(settings["trackingConfidence"])
+        trackingConfidence.setMaximum(1.0)
+        trackingConfidence.setMinimum(0.0)
+        trackingConfidence.setDecimals(2)
+        trackingConfidence.setSingleStep(0.05)
+        trackingConfidence.valueChanged.connect(lambda value: settings.__setitem__("trackingConfidence", value))
+        
+        layout.addLayout(self._addSetting("Tracking Confidence for the algorithm",
+                                         "Set the traquing confidence score requiered for the palm detection model to maintain the hand between frames",
+                                         trackingConfidence), 0)
+        
+        #Choice of the presence confidence
+        presenceConfidence = QDoubleSpinBox()
+        presenceConfidence.setValue(settings["presenceConfidence"])
+        presenceConfidence.setMaximum(1.0)
+        presenceConfidence.setMinimum(0.0)
+        presenceConfidence.setDecimals(2)
+        presenceConfidence.setSingleStep(0.05)
+        presenceConfidence.valueChanged.connect(lambda value: settings.__setitem__("presenceConfidence", value))
+        
+        layout.addLayout(self._addSetting("Presence Confidence for the algorithm",
+                                         "Set the presence confidence score requiered for the palm detection model to find the hand if it is partialy covered or on the edge of the screen",
+                                         presenceConfidence), 0)
+
+        #depth camera options
+        self.checkZed(settings, layout)
+
+        layout.addStretch()
+
+        settingList = QScrollArea()
+        settingList.setWidgetResizable(True)
+        container = QWidget()
+        container.setLayout(layout)
+        settingList.setWidget(container)
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(settingList, 1)
+        mainLayout.addWidget(closeButton, 0)
+        self.setLayout(mainLayout)
+
+
+    @staticmethod
+    def _addSetting(name:str, description:str, widget:QWidget)-> QVBoxLayout:
+        """
+        Add a setting to the list and does its styling.
+        """
+        layout = QVBoxLayout()
+
+        nameLabel = QLabel(name)
+        nameLabel.setObjectName("nameLabel")
+        nameLabel.setStyleSheet("""
+                                QLabel#nameLabel {
+                                    color :  #FFFF00;
+                                    font-size: 18px;
+                                    font-weight : bold;
+                                }                                
+        """)
+        descriptionLabel = QLabel(description)
+
+        layout.addWidget(nameLabel, 0)
+        layout.addWidget(descriptionLabel, 0)
+        widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        widget.setMinimumSize(100, 25)
+        widget.setMaximumSize(600, 40)
+        layout.addWidget(widget, 0)
+        layout.setContentsMargins(0,10,0,10)
+
+        return layout
+    
+
+    def checkZed(self, settings, layout) -> None:
+        """
+        Options for the Zed depth camera.
+        """
+        settings["depthCameraAvailable"] = self._checkPyzed()
+        if not settings["depthCameraAvailable"]: return
+        
+        #Enabling the depth camera
+        zedCheckBox = QCheckBox("Make the depth camera available")
+        zedCheckBox.setChecked(settings["depthCameraAvailable"])
+        zedCheckBox.stateChanged.connect(lambda checked: settings.__setitem__("depthCameraAvailable", bool(checked)))
+        
+        layout.addLayout(self._addSetting("Use depth cameras",
+                                         "Make the use of Zed depth camera available when recording",
+                                         zedCheckBox), 0)
+        
+        #Minimum depth
+        zedMinDepth = QDoubleSpinBox()
+        zedMinDepth.setValue(settings["zedDepthMin"])
+        zedMinDepth.setMaximum(1.0)
+        zedMinDepth.setMinimum(0.2)
+        zedMinDepth.setDecimals(2)
+        zedMinDepth.setSingleStep(0.01)
+        zedMinDepth.valueChanged.connect(lambda value: settings.__setitem__("zedDepthMin", value))
+        
+        layout.addLayout(self._addSetting("Minimum depth",
+                                         "Set the minimum depth for the Zed depth camera",
+                                         zedMinDepth), 0)
+        
+        #Maximum depth
+        zedMaxDepth = QDoubleSpinBox()
+        zedMaxDepth.setValue(settings["zedDepthMax"])
+        zedMaxDepth.setMaximum(10.0)
+        zedMaxDepth.setMinimum(1.0)
+        zedMaxDepth.setDecimals(2)
+        zedMaxDepth.setSingleStep(0.01)
+        zedMaxDepth.valueChanged.connect(lambda value: settings.__setitem__("zedDepthMax", value))
+        
+        layout.addLayout(self._addSetting("Maximum depth",
+                                         "Set the maximum depth for the Zed depth camera",
+                                         zedMaxDepth), 0)
+        
+        #Choice of resolution (vga to 2k)
+        zedResolution = QComboBox()
+        zedResolution.addItems(["VGA", "HD720", "HD1080", "HD2K"])
+        zedResolution.setCurrentText(settings["zedResolution"] if settings["zedResolution"] is not None else "HD1080")
+        zedResolution.currentTextChanged.connect(lambda: self._updateComboBox(zedResolution.currentText(), settings))
+
+        layout.addLayout(self._addSetting("Resolution",
+                                         "Set the resolution for the zed depth camera",
+                                         zedResolution), 0)
+
+        #Choice of Fps to use
+        self.zedFps = QComboBox()
+        self._updateComboBox(zedResolution.currentText(), settings)
+        self.zedFps.setCurrentText(f"{str(settings["zedFps"])}FPS")
+        self.zedFps.currentTextChanged.connect(lambda: settings.__setitem__("zedFps",int(self.zedFps.currentText().removesuffix("FPS"))) if self.zedFps.currentText() else 0)
+
+        layout.addLayout(self._addSetting("Frame rate",
+                                         "Set the maximum frame rate for the zed depth camera",
+                                         self.zedFps), 0)
+        
+        #Choice of mode to use
+        zedMode = QComboBox()
+        zedMode.addItems(["Neural_Light", "Neural", "Neural_Complete"])
+        zedMode.setCurrentText(settings["zedMode"] if settings["zedMode"] is not None else "Neural_Light")
+        zedMode.currentTextChanged.connect(lambda text: settings.__setitem__("zedMode", text))
+
+        layout.addLayout(self._addSetting("Mode",
+                                         "Set the mode for the depth camera neural network",
+                                         zedMode), 0)
+        
+
+
+    def _updateComboBox(self, value:str, settings) -> None:
+        """
+        Update the "zedFps" combo box to only contain the supported Fps for the chosen resolution.
+        """
+        settings["zedResolution"] = value
+        fps = settings["zedFps"]
+        options = ["VGA", "HD720", "HD1080", "HD2K"]
+
+        self.zedFps.clear()
+        self.zedFps.addItems(["15FPS", "30FPS", "60FPS", "100FPS"])
+
+        for i in range(0, self.zedFps.count()):
+            if value == options[i]:
+                maxFps = int(self.zedFps.itemText(self.zedFps.count() - 1).removesuffix("FPS"))
+                self.zedFps.setCurrentText(f"{min(fps, maxFps)}FPS")
+                settings["zedFps"] = min(fps, maxFps)
+                return
+            else:
+                self.zedFps.removeItem(self.zedFps.count() - 1)
+
+        self.zedFps.setCurrentText("")
+        self.zedFps.removeItem(0)
+        settings["zedFps"] = 0
+        
+
+    def saveAndClose(self, settings, mainSettings):
+        """
+        Saving the app settings and closing the sttings dialog.
+        """
+        mainSettings.clear()
+        mainSettings.update(settings)
+        saveSettings()
+        self.accept()
+
+
+    def findDir(self):
+        """
+        Get the user's chosen directory then set the input to its path.
+        """
+        dirName = QFileDialog.getExistingDirectory(
+            self, 
+            "Select a directory", 
+            QFileDialog.Option.ShowDirsOnly
+        )
+
+        if dirName:
+            self.dirInput.setText(str(path.abspath(dirName)))
+
+    @staticmethod
+    def _checkPyzed() -> bool:
+        """
+        Check if the pyzed module is installed.
+        """
+        try:
+            import pyzed.sl
+        except ImportError:
+            return False
+        return True

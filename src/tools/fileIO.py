@@ -1,3 +1,4 @@
+from src.tools.setting import GlobalSettings
 import json
 import os
 
@@ -48,3 +49,31 @@ def setDelayForParent(filePath: str, parentPath: str, workingPath: str, delay: i
 
     with open(delayPath, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4, ensure_ascii=False)
+
+
+def saveSettings() -> None:
+    """
+    **Saving the app settings.**
+    Saving and overwriting the settings of the app to
+    settings.json in the current working directory"""
+    path = os.path.join(os.getcwd(), "settings.json")
+
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(GlobalSettings, file, indent=4, ensure_ascii=False)
+
+
+def loadSettings() -> None:
+    """
+    **Loading the app settings.** 
+    Loading the settings for the current session from 
+    settings.json in the current working directory.
+    """
+    path = os.path.join(os.getcwd(), "settings.json")
+
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as file:
+                 data = json.load(file)
+                 GlobalSettings.update(data)
+        except (json.JSONDecodeError, OSError):
+            return

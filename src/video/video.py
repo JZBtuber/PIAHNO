@@ -4,6 +4,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (QLabel, QVBoxLayout,
                              QCheckBox, QSizePolicy, QHBoxLayout)
 from src.tools.mediapipe.algorithms import mediaWork
+from src.tools.setting import GlobalSettings
 from src.video.Zed import Zed
 import numpy as np
 import time
@@ -36,6 +37,7 @@ class VideoWorker(basicWorker):
     # ------------------------------------------------------------------
     def beforeLoop(self):
         path = self.path
+        self._depthMode = self.useDepthCamera
 
         if not self.useDepthCamera:
             self.capture = cv2.VideoCapture(path, (cv2.CAP_DSHOW if self.isLive else None))
@@ -99,7 +101,7 @@ class VideoWorker(basicWorker):
     def _loop_live(self):
         loop_start = time.perf_counter()
 
-        if self.useDepthCamera:
+        if self._depthMode:
             ret, frame = self.Zed.read()
         else:
             ret, frame = self.capture.read()
@@ -126,7 +128,7 @@ class VideoWorker(basicWorker):
             if frameTimeMs > nowMs:
                 break
 
-            # Seek to the exact frame by timestamp instead of reading blindly
+            # Seek to the exact frame by timestamp
             self.capture.set(cv2.CAP_PROP_POS_MSEC, frameTimeMs)
             ret, frame = self.capture.read()
 
@@ -148,7 +150,7 @@ class VideoWorker(basicWorker):
             return
 
         # ZED returns BGRA, OpenCV returns BGR.
-        if self.useDepthCamera:
+        if self._depthMode:
             if frame.shape[2] == 4:
                 bgr_frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
             else:
@@ -215,23 +217,24 @@ class VideoWorker(basicWorker):
         # Only used for ZED / depth camera recording
         self.recordedPointClouds = []
 
-        ts = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:19]
-        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{ts}_Test"), exist_ok=True)
+        path = self.getRecordingPath()
+
+        os.makedirs(path, exist_ok=True)
 
         self.newPath = os.path.join(
-            os.getcwd(),
-            f"Tests\\{ts}_Test\\Video_{self.ID}.mp4"
+            path,
+            f"Video_{self.ID}.mp4"
         )
 
         if self.useDepthCamera:
             self.newHandPointCloudPath = os.path.join(
-                os.getcwd(),
-                f"Tests\\{ts}_Test\\Video_{self.ID}_PointCloud.npz"
+                path,
+                f"Video_{self.ID}_PointCloud.npz"
             ) 
 
             self.newCameraParametersPath = os.path.join(
-                os.getcwd(),
-                f"Tests\\{ts}_Test\\Video_{self.ID}_CameraParameters.json"
+                path,
+                f"Video_{self.ID}_CameraParameters.json"
             )
 
     def recordloop(self):
@@ -333,16 +336,6 @@ class VideoFeed(basicWindowWidget):
 
         self.makeBasicWidget()
 
-        self.lockNotDepth      = False
-
-        try:
-            import pyzed
-        except:
-            self.lockNotDepth = True
-        
-        if not self.lockNotDepth:
-            del sys.modules["pyzed"]
-
 
     def updateCameraNumber(self, n):
         self.cameraNumber = n
@@ -373,7 +366,7 @@ class VideoFeed(basicWindowWidget):
     def setIsLive(self, s):
         super().setIsLive(s)
 
-        if not s and not self.lockNotDepth:
+        if not s and GlobalSettings["depthCameraAvailable"]:
             self.depthCamera.setChecked(False)
 
-        self.depthCamera.setEnabled(s)
+        self.depthCamera.setEnabled(s and GlobalSettings["depthCameraAvailable"])

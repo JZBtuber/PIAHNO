@@ -1,12 +1,12 @@
 import mido
 import os
-from PyQt6.QtWidgets import QCheckBox, QWidget, QFileDialog, QHBoxLayout, QVBoxLayout, QListWidgetItem, QLabel, QListWidget, QPushButton, QLineEdit
-from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtWidgets import  QFileDialog, QVBoxLayout, QListWidgetItem, QListWidget, QPushButton
+from PyQt6.QtCore import pyqtSignal, QThread
 from PyQt6.QtGui import QColor
 from src.gui.Core import *
 from datetime import datetime
 import time
-import numpy as np
+
 
 
 
@@ -116,9 +116,7 @@ class MidiWorker(basicWorker):
 
     def initRecording(self):
 
-        timeStr = str(datetime.now()).replace(" ", "_").replace(":", "-")[0:19]
-        os.makedirs(os.path.join(os.getcwd(), f"Tests\\{timeStr}_Test"), exist_ok=True)
-        self.newPath = os.path.join(os.getcwd(), f"Tests\\{timeStr}_Test\\Midi_{self.ID}.mid")
+        self.newPath = os.path.join(self.getRecordingPath(), f"Midi_{self.ID}.mid")
         
         self.midi_recording = mido.MidiFile(ticks_per_beat=480)
         self.track = mido.MidiTrack()

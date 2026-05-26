@@ -1,5 +1,5 @@
 import time
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, QThread, QTimer, QObject
+from PyQt6.QtCore import pyqtSlot, QObject
 from src.gui.Core import basicWindowWidget
 
 
