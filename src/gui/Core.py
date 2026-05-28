@@ -128,6 +128,7 @@ class RecordingWorker(QObject):
 
         #Basic recording loop with init and closing
         try:
+            print("Init")
             self.initFunc()
 
             while self.running:
@@ -135,6 +136,7 @@ class RecordingWorker(QObject):
                 QThread.msleep(1)
 
         finally:
+            print("Stop")
             self.stopFunc()
             self.finished.emit()
 
@@ -228,31 +230,31 @@ class basicWorker(QObject):
                 self.finished.emit()
 
     #-----------------------------------------------------------
-    #Placeholder functions to be filled by the feeds
+    #Abstract functions to be filled by the feeds
     #-----------------------------------------------------------
 
     def beforeLoop(self):
-        print("Before the loop")
+        raise NotImplementedError
     
 
     def loop(self):
-        print("Looping")
+        raise NotImplementedError
 
 
     def afterLoop(self):
-        print("After the loop")
+        raise NotImplementedError
 
 
     def initRecording(self):
-        print("Initiatiing Recording")
+        raise NotImplementedError
 
 
     def stopRecording(self):
-        print("Stop recording")
+        raise NotImplementedError
 
 
     def recordloop(self):
-        print("Recording")
+        raise NotImplementedError
 
     #--------------------------------------------------------
     #Recording functions
@@ -286,8 +288,8 @@ class basicWorker(QObject):
 
             self.recorder.finished.connect(self.recordThread.quit)
             self.recorder.finished.connect(self.recorder.deleteLater)
+            self.recorder.finished.connect(self._recordThreadFinished, Qt.ConnectionType.DirectConnection)
             self.recordThread.finished.connect(self.recordThread.deleteLater)
-            self.recordThread.finished.connect(self._recordThreadFinished)
             
             self.stopRecord.connect(self.recorder.stop, Qt.ConnectionType.DirectConnection)
 
@@ -301,7 +303,9 @@ class basicWorker(QObject):
                 self.stopRecord.emit()
 
 
+
     def _recordThreadFinished(self):
+        print("Cleaned")
         self.recorder = None
         self.recordThread = None
         self.isRecording = False
@@ -312,7 +316,7 @@ class basicWorker(QObject):
 
     @pyqtSlot()
     def pause(self):
-            self.paused = not self.paused
+        self.paused = not self.paused
 
 
     @pyqtSlot()
@@ -330,24 +334,24 @@ class basicWorker(QObject):
 
 
     @pyqtSlot(bool)
-    def mute(self, s):
-            self.muted = s
+    def mute(self, s) -> None:
+        self.muted = s
 
 
     @pyqtSlot(bool)
-    def setRecord(self, s):
-            self.record = s
+    def setRecord(self, s) -> None:
+        self.record = s
 
 
-    def setDelayed(self, s):
+    def setDelayed(self, s) -> None:
         self.delayed = s
 
 
-    def setMasterClock(self, clock):
+    def setMasterClock(self, clock) -> None:
         self.masterClock = clock
 
 
-    def getMasterTimeMs(self):
+    def getMasterTimeMs(self) -> int:
         if self.masterClock is not None:
             return self.masterClock.elapsedMs() - self.delay
         if self.localStartTime is None:

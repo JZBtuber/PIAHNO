@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import  QFileDialog, QVBoxLayout, QListWidgetItem, QListWid
 from PyQt6.QtCore import pyqtSignal, QThread
 from PyQt6.QtGui import QColor
 from src.gui.Core import *
-from datetime import datetime
 import time
 
 
@@ -115,8 +114,13 @@ class MidiWorker(basicWorker):
 
 
     def initRecording(self):
+        print("Init record")
+        
+        recordpath = self.getRecordingPath()
 
-        self.newPath = os.path.join(self.getRecordingPath(), f"Midi_{self.ID}.mid")
+        self.newPath = os.path.join(recordpath, f"Midi_{self.ID}.mid")
+
+        os.makedirs(recordpath, exist_ok=True)
         
         self.midi_recording = mido.MidiFile(ticks_per_beat=480)
         self.track = mido.MidiTrack()

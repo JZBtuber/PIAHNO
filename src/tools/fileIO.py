@@ -77,3 +77,22 @@ def loadSettings() -> None:
                  GlobalSettings.update(data)
         except (json.JSONDecodeError, OSError):
             return
+        
+
+def saveScripts(paths) -> None:
+    path = os.path.join(os.getcwd(), "scripts.json")
+
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump({"Scripts" : paths}, file, indent=4, ensure_ascii=False)
+
+
+def loadScripts():
+    path = os.path.join(os.getcwd(), "scripts.json")
+
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as file:
+                data = json.load(file)
+                return data["Scripts"]
+        except (json.JSONDecodeError, OSError):
+            return

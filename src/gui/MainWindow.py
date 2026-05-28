@@ -12,28 +12,47 @@ from src.tools.keyFrameExporter import KeyFrameExporter
 from src.video.keyFrames import KeyFeed
 from src.tools.fileIO import saveSettings,loadSettings
 from src.tools.setting import GlobalSettings
+from src.gui.ScriptWindow import ScriptBox
 import copy
 from os import path
 
 class WidgetData():
+    """
+    Storage of the ID and the widget of each window.
+    """
     def __init__(self, widget: QWidget = None, ID: int = 0):
         self.widget = widget
         self.ID = ID
 
     
-    def setID(self, ID: int):
+    def setID(self, ID: int) -> None:
+        """
+        Set the ID of the widget.
+        """
         self.ID = ID
 
     
-    def getID(self):
+    def getID(self) -> int:
+        """
+        Get the ID of the widget.
+        """
         return self.ID
     
 
-    def getWidget(self):
+    def getWidget(self) -> QWidget:
+        """
+        Get a reference to the wiget object.
+        """
         return self.widget
 
 
 class MainWindow(QMainWindow):
+    """
+    Main window of the app.\n
+    It contains all the other widgets and feed.
+    Most of the logic for adding, removing and managing windows is in this class.
+    It's in charge of managing most of the other classes of the app.
+    """
     windowAdded = pyqtSignal(QWidget)
 
     def __init__(self, workingPath: str):
@@ -55,97 +74,100 @@ class MainWindow(QMainWindow):
         loadSettings()
 
         self.settings = GlobalSettings
-        print(GlobalSettings)
 
-    def addBaseWidget(self):
-        self.fond = QWidget()
+
+    def addBaseWidget(self) -> None:
+        """
+        Makes the basic widget for the background of the window.
+        """
+        fond = QWidget()
         self.fondLayout = QGridLayout()
         self.fondLayout.setSpacing(10)
-        self.fond.setLayout(self.fondLayout)
+        fond.setLayout(self.fondLayout)
         self.dialog = WindowChoice(self, self.windows)
 
-        self.addTopMenu()
-        self.addMenuBar()
+        self._addTopMenu()
+        self._addMenuBar()
+
+        self.setCentralWidget(fond)
 
 
-        self.setCentralWidget(self.fond)
-
-
-    def addTopMenu(self):
-
-        self.toolbar = QToolBar()
-        self.addToolBar(self.toolbar)
+    def _addTopMenu(self) -> None:
+        """
+        Add the top - Quick access - menu to the main window.
+        """
+        toolbar = QToolBar()
+        self.addToolBar(toolbar)
         
-
-
-        self.quickAccess = [QAction("Add/Remove a window", self),
-                            QAction("Remove All windows"),
+        quickAccess = [QAction("Add/Remove a window", self),
+                            QAction("Remove All windows", self),
                             QAction("Start", self),
                             QAction("Pause/Resume", self),
-                            QAction("Stop",self),
+                            QAction("Stop", self),
                             QAction("Record", self)
                             ]
         
-        self.quickAccess[0].setStatusTip("Add or remove an observation window")
-        self.quickAccess[1].setStatusTip("Remove all observation windows")
-        self.quickAccess[2].setStatusTip("Start all video/audio")
-        self.quickAccess[3].setStatusTip("Pause and resume all video/audio")
-        self.quickAccess[4].setStatusTip("Stop all video/audio")
-        self.quickAccess[5].setStatusTip("Recording all windows")
+        quickAccess[0].setStatusTip("Add or remove an observation window")
+        quickAccess[1].setStatusTip("Remove all observation windows")
+        quickAccess[2].setStatusTip("Start all video/audio")
+        quickAccess[3].setStatusTip("Pause and resume all video/audio")
+        quickAccess[4].setStatusTip("Stop all video/audio")
+        quickAccess[5].setStatusTip("Recording all windows")
 
-        self.quickAccess[0].triggered.connect(self.dialog.exec)
-        self.quickAccess[1].triggered.connect(self.removeAllWindow)
-        self.quickAccess[2].triggered.connect(self.startALL)
-        self.quickAccess[3].triggered.connect(self.pauseALL)
-        self.quickAccess[4].triggered.connect(self.stopALL)
-        self.quickAccess[5].triggered.connect(self.chooseRecording)
+        quickAccess[0].triggered.connect(self.dialog.exec)
+        quickAccess[1].triggered.connect(self.removeAllWindow)
+        quickAccess[2].triggered.connect(self.startALL)
+        quickAccess[3].triggered.connect(self.pauseALL)
+        quickAccess[4].triggered.connect(self.stopALL)
+        quickAccess[5].triggered.connect(self.chooseRecording)
 
-        self.quickAccess[5].setCheckable(True)
+        quickAccess[5].setCheckable(True)
 
+        toolbar.addActions(quickAccess)
 
-        self.toolbar.addActions(self.quickAccess)
-
-        for i, action in enumerate(self.quickAccess):
+        for i, action in enumerate(quickAccess):
             if i == 2 or i == 5:
-                self.toolbar.addSeparator()
-            self.toolbar.addAction(action)
+                toolbar.addSeparator()
+            toolbar.addAction(action)
 
 
-    def addMenuBar(self):
-        self.filesOptions = [QAction("Save", self),
-                             QAction("Load", self),
-                             QAction("Export", self)
-                            ]
-
-        self.editOptions = [QAction("Settings", self),
-                            QAction("Add and remove windows", self),
-                            ]
-        self.editOptions[0].triggered.connect(self.setSettings)
-        self.editOptions[1].triggered.connect(self.dialog.exec)
-
-        self.toolOptions1 = [QAction("Sync Midi", self),
-                              QAction("Sync Video", self)]
-        self.toolOptions1[0].triggered.connect(self.midiSync)
-        self.toolOptions1[1].triggered.connect(self.videoSync)
+    def _addMenuBar(self) -> None:
+        """
+        Add the differrent options to the menu bar.
+        """
+        filesOptions = [QAction("Save", self),
+                        QAction("Load", self),
+                        QAction("Export", self)
+                        ]
         
-        self.toolOptions2 = [QAction("Preload Video", self),
-                             QAction("Export Key Frames",self)]
-        self.toolOptions2[0].triggered.connect(self.preload)
-        self.toolOptions2[1].triggered.connect(self.exportKeyFrames)
+        editOptions = [QAction("Settings", self),
+                       QAction("Add and remove windows", self),
+                        ]
+        editOptions[0].triggered.connect(self.setSettings)
+        editOptions[1].triggered.connect(self.dialog.exec)
 
-        self.menu = self.menuBar()
-        self.fileMenu = self.menu.addMenu("&Files")
-        self.editMenu = self.menu.addMenu("&Edit")
-        self.toolMenu = self.menu.addMenu("&Tools")
+        toolOptions1 = [QAction("Sync Midi", self),
+                        QAction("Sync Video", self)]
+        toolOptions1[0].triggered.connect(self.midiSync)
+        toolOptions1[1].triggered.connect(self.videoSync)
+        
+        toolOptions2 = [QAction("Preload Video", self),
+                        QAction("Export Key Frames", self),
+                        QAction("Load script", self)]
+        toolOptions2[0].triggered.connect(self.preload)
+        toolOptions2[1].triggered.connect(self.exportKeyFrames)
+        toolOptions2[2].triggered.connect(self.loadScript)
 
+        menu = self.menuBar()
+        fileMenu = menu.addMenu("&Files")
+        editMenu = menu.addMenu("&Edit")
+        toolMenu = menu.addMenu("&Tools")
         
-        self.fileMenu.addActions(self.filesOptions)
-        
-        self.editMenu.addActions(self.editOptions)
-        
-        self.toolMenu.addActions(self.toolOptions1)
-        self.toolMenu.addSeparator()
-        self.toolMenu.addActions(self.toolOptions2)
+        fileMenu.addActions(filesOptions)
+        editMenu.addActions(editOptions)
+        toolMenu.addActions(toolOptions1)
+        toolMenu.addSeparator()
+        toolMenu.addActions(toolOptions2)
 
 
     def addWindow(self, widgetClass):
@@ -258,6 +280,10 @@ class MainWindow(QMainWindow):
         sync = None
 
 
+    def loadScript(self):
+        loader = ScriptBox()
+        loader.exec()
+        loader = None
 
     def getWidgetByID(self, ID: int = 0) -> QWidget:
         for i in self.windows:
@@ -384,6 +410,9 @@ class WindowChoice(QDialog):
         super().exec()
 
 class SettingBox(QDialog):
+    """
+    Settings menu to the app in a "QDialog" box.
+    """
     def __init__(self, mainSettings):
         super().__init__()
         self.setFixedSize(1000, 800)
@@ -560,6 +589,7 @@ class SettingBox(QDialog):
         zedResolution.addItems(["VGA", "HD720", "HD1080", "HD2K"])
         zedResolution.setCurrentText(settings["zedResolution"] if settings["zedResolution"] is not None else "HD1080")
         zedResolution.currentTextChanged.connect(lambda: self._updateComboBox(zedResolution.currentText(), settings))
+        
 
         layout.addLayout(self._addSetting("Resolution",
                                          "Set the resolution for the zed depth camera",
@@ -570,6 +600,7 @@ class SettingBox(QDialog):
         self._updateComboBox(zedResolution.currentText(), settings)
         self.zedFps.setCurrentText(f"{str(settings["zedFps"])}FPS")
         self.zedFps.currentTextChanged.connect(lambda: settings.__setitem__("zedFps",int(self.zedFps.currentText().removesuffix("FPS"))) if self.zedFps.currentText() else 0)
+        
 
         layout.addLayout(self._addSetting("Frame rate",
                                          "Set the maximum frame rate for the zed depth camera",
@@ -578,8 +609,8 @@ class SettingBox(QDialog):
         #Choice of mode to use
         zedMode = QComboBox()
         zedMode.addItems(["Neural_Light", "Neural", "Neural_Complete"])
+        zedMode.currentTextChanged.connect(lambda: settings.__setitem__("zedMode", zedMode.currentText()))
         zedMode.setCurrentText(settings["zedMode"] if settings["zedMode"] is not None else "Neural_Light")
-        zedMode.currentTextChanged.connect(lambda text: settings.__setitem__("zedMode", text))
 
         layout.addLayout(self._addSetting("Mode",
                                          "Set the mode for the depth camera neural network",
@@ -628,7 +659,8 @@ class SettingBox(QDialog):
         """
         dirName = QFileDialog.getExistingDirectory(
             self, 
-            "Select a directory", 
+            "Select a directory",
+            "",
             QFileDialog.Option.ShowDirsOnly
         )
 
