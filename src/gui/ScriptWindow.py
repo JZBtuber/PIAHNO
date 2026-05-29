@@ -4,6 +4,7 @@ from src.tools.ScriptReader import getScore
 from src.tools.fileIO import saveScripts, loadScripts
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from src.tools.setting import GlobalSettings
 import pickle
 import os
 
@@ -11,7 +12,6 @@ class ScriptBox(QDialog):
     """
     Dialog for the use of the outside scripts.
     """
-
     scriptChanged = pyqtSignal(str)
 
     def __init__(self):
@@ -23,9 +23,6 @@ class ScriptBox(QDialog):
         self.scriptPathsWidgets = []
         self.filePathsWidgets = []
 
-        self.selectedFile = None
-        self.selectedScript = None
-
         self.score = 0
         self.chosenScript = None
         self.loadedPlot = 0
@@ -33,8 +30,11 @@ class ScriptBox(QDialog):
         self.values = []
         self.figures = []
 
+        self.data = None
+        self.testName = ""
 
-        horizontalLayout = QHBoxLayout()
+
+        gridLayout = QGridLayout()
 
         inputLayout = QGridLayout()
         inputLayout.setColumnStretch(0, 1)
@@ -49,12 +49,18 @@ class ScriptBox(QDialog):
         self.fillControls(controlLayout)
         self.fillScript(scriptLayout)
 
-        horizontalLayout.addLayout(inputLayout, 1)
-        horizontalLayout.addLayout(controlLayout, 2)
-        horizontalLayout.addLayout(scriptLayout, 1)
+        gridLayout.addLayout(inputLayout, 0, 0, 2, 1)
+        gridLayout.addLayout(controlLayout, 0, 1, 2, 1)
+        gridLayout.addLayout(scriptLayout, 0, 2, 2, 1)
 
-        horizontalLayout.addStretch()
-        self.setLayout(horizontalLayout)
+        gridLayout.setColumnStretch(0, 1)
+        gridLayout.setColumnStretch(1, 2)
+        gridLayout.setColumnStretch(2, 1)
+
+        gridLayout.setRowStretch(0, 1)
+        gridLayout.setRowStretch(1, 1)
+
+        self.setLayout(gridLayout)
 
         paths = loadScripts()
 
@@ -70,7 +76,6 @@ class ScriptBox(QDialog):
         """
         Fill the input layout.
         """
-
         inputLayout.setColumnStretch(0, 1)
         inputLayout.setColumnStretch(1, 1)
         inputLayout.setRowStretch(0, 0)
@@ -103,8 +108,13 @@ class ScriptBox(QDialog):
 
         inputLayout.addWidget(fileScrollArea, 2, 0, 1, 2)
 
+        
+
 
     def addFile(self, path) -> None:
+        """
+        Add a file to the list.
+        """
         text = QLabel(path)
         text.setObjectName("text")
         text.setStyleSheet("""
@@ -352,6 +362,11 @@ class ScriptBox(QDialog):
 
         controlLayout.addWidget(self.table, 3, 0, 2, 2)
 
+        saveResultsButton = QPushButton("Save the test's results")
+        saveResultsButton.clicked.connect(self.saveResults)
+
+        controlLayout.addWidget(saveResultsButton, 13, 0, 1, 2)
+
             
     def start(self) -> None:
 
@@ -363,8 +378,8 @@ class ScriptBox(QDialog):
             filepaths.append(widget.text())
         
         try:
-            data = getScore(self.chosenScript, filepaths)
-            results = pickle.loads(data.stdout)
+            self.data = pickle.loads(getScore(self.chosenScript, filepaths).stdout)
+            results = self.data
         except Exception as e:
             print(str(e))
             self.values = []
@@ -373,7 +388,7 @@ class ScriptBox(QDialog):
             self.scoreLabel.setText("FAILED")
             return
         
-
+        self.testName = os.path.basename(self.chosenScript)
 
         self.values = []
 
@@ -384,6 +399,8 @@ class ScriptBox(QDialog):
                 self.scoreLabel.setText(f"Score: \n {self.score}")
             elif result.lower().startswith("plot"):
                 self.figures.append(results[result])
+            elif result.lower().startswith("time"):
+                ""
             else:
                 self.values.append((result, results[result]))
 
@@ -489,10 +506,17 @@ class ScriptBox(QDialog):
 import sys
 import pickle
 import matplotlib.pyplot as plt
+import datetime
+import os
 
 
 files = sys.argv    #Array containing the PATH to the input files
 
+#Get the live or file time for analitics over time
+if len(files) > 1:
+    fileDate = datetime.datetime.fromtimestamp(os.path.getctime(files[1]))[:19].replace(" ", "_").replace(":", "-")
+else:
+    fileDate = str(datetime.datetime.now())[:19].replace(" ", "_").replace(":", "-")
 
 #EXEMPLE of plot 
 figure, ax = plt.subplots()
@@ -501,24 +525,68 @@ ax.bar([1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,5,4,3,2,1])
 #ONLY way to send data to the app!!
 array = {"Score" : 512, # <-- "Score" must be the key to the score variable
          "Value1" : 256, # <-- "Every thing else will go into the table...
-         "Plot1" : figure # <-- ...execpt "Plot" wich will go in a figure
+         "Plot1" : figure, # <-- ...execpt "Plot" wich will go in a figure
+         "Time" : fileDate
          }
 
 #Send data to the app
 data = pickle.dumps(array)
 sys.stdout.buffer.write(data)""")
                 
-
     def createTable(self):
         self.table = QTableWidget()
-        self.table.setRowCount(30)
+        self.table.setRowCount(100)
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Test", "Score"])
+        self.table.setHorizontalHeaderLabels(["Tests", "Score"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)      
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def fillTable(self):
         self.table.clearContents()
-        for i, (key, value) in enumerate(self.values[:30]):
+        for i, (key, value) in enumerate(self.values[:100]):
             self.table.setItem(i, 0, QTableWidgetItem(str(key)))
             self.table.setItem(i, 1, QTableWidgetItem(str(value)))
+
+
+    def saveResults(self):
+        if not self.data["Time"]:
+            return
+        self.data["TestName"] = self.testName
+        
+        pathToFile = GlobalSettings["pathToWorkingDir"] if GlobalSettings["pathToWorkingDir"] else os.path.join(os.getcwd(), "Tests")
+        filepath = f"{GlobalSettings["participantName"]}\\Results" if GlobalSettings["participantName"] else f"Results"
+
+        path = os.path.join(pathToFile, filepath)
+
+        os.makedirs(path, exist_ok=True)
+
+        with open(os.path.join(path, f"{self.testName}_{self.data["Time"]}_results.pkl"), "wb") as file:
+            pickle.dump(self.data, file)
+
+
+class overTimeBox(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(1200, 800)
+
+        mainLayout = QGridLayout()
+
+        self.setLayout(mainLayout)
+
+        self.chosenResults = ""
+
+        self.dataSets = []
+
+
+    def loadFiles(self):
+        if self.chosenResults:
+            testName = (pickle.loads(self.chosenResults))["TestName"]
+
+        for file in os.listdir(os.path.dirname(self.chosenResults)):
+            if os.path.isfile(os.join(os.path.dirname(self.chosenResults), file)):
+                try:
+                    data = pickle.loads(os.path.dirname(self.chosenResults), file)
+                    if data["testName"] == testName:
+                        self.dataSets.append(data)
+                except:
+                    continue

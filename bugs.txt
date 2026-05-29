@@ -1,5 +1,0 @@
-video file path not defined at the same time as audio and video
-
-video loader needs restart to work twice
-
-No seperators in meu bar
