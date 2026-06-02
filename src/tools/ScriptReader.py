@@ -38,5 +38,3 @@ def runPythonScript(pathToSript, pathToFiles):
                             check=True,
                             timeout=15)
     return result
-
-    

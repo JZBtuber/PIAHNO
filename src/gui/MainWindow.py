@@ -13,6 +13,7 @@ from src.video.keyFrames import KeyFeed
 from src.tools.fileIO import saveSettings,loadSettings
 from src.tools.setting import GlobalSettings
 from src.gui.ScriptWindow import ScriptBox
+from src.gui.ScriptWindow import ResultLoader
 import copy
 from os import path
 
@@ -135,39 +136,41 @@ class MainWindow(QMainWindow):
         """
         Add the differrent options to the menu bar.
         """
-        filesOptions = [QAction("Save", self),
-                        QAction("Load", self),
-                        QAction("Export", self)
-                        ]
-        
-        editOptions = [QAction("Settings", self),
-                       QAction("Add and remove windows", self),
-                        ]
-        editOptions[0].triggered.connect(self.setSettings)
-        editOptions[1].triggered.connect(self.dialog.exec)
-
-        toolOptions1 = [QAction("Sync Midi", self),
-                        QAction("Sync Video", self)]
-        toolOptions1[0].triggered.connect(self.midiSync)
-        toolOptions1[1].triggered.connect(self.videoSync)
-        
-        toolOptions2 = [QAction("Preload Video", self),
-                        QAction("Export Key Frames", self),
-                        QAction("Load script", self)]
-        toolOptions2[0].triggered.connect(self.preload)
-        toolOptions2[1].triggered.connect(self.exportKeyFrames)
-        toolOptions2[2].triggered.connect(self.loadScript)
-
         menu = self.menuBar()
         fileMenu = menu.addMenu("&Files")
         editMenu = menu.addMenu("&Edit")
         toolMenu = menu.addMenu("&Tools")
         
-        fileMenu.addActions(filesOptions)
-        editMenu.addActions(editOptions)
-        toolMenu.addActions(toolOptions1)
+        fileMenu.addActions([QAction("Save", self),
+                             QAction("Load", self),
+                             QAction("Export", self)
+                            ])
+        
+        
+        editMenu.addActions([QAction("Settings", self),
+                             QAction("Add and remove windows", self),
+                            ])
+        editMenu.actions()[0].triggered.connect(self.setSettings)
+        editMenu.actions()[1].triggered.connect(self.dialog.exec)
+
+
+        toolMenu.addActions([QAction("Sync Midi", self),
+                             QAction("Sync Video", self)
+                            ])
         toolMenu.addSeparator()
-        toolMenu.addActions(toolOptions2)
+        toolMenu.addActions([QAction("Preload Video", self),
+                             QAction("Export Key Frames", self)
+                            ])
+        toolMenu.addSeparator()
+        toolMenu.addActions([QAction("Load script", self),
+                             QAction("Load results", self)
+                            ])
+        toolMenu.actions()[0].triggered.connect(self.midiSync)
+        toolMenu.actions()[1].triggered.connect(self.videoSync)
+        toolMenu.actions()[3].triggered.connect(self.preload)
+        toolMenu.actions()[4].triggered.connect(self.exportKeyFrames)
+        toolMenu.actions()[6].triggered.connect(self.loadScript)
+        toolMenu.actions()[7].triggered.connect(self.loadResults)
 
 
     def addWindow(self, widgetClass):
@@ -284,6 +287,12 @@ class MainWindow(QMainWindow):
         loader = ScriptBox()
         loader.exec()
         loader = None
+
+
+    def loadResults(self):
+        resultsLoader = ResultLoader()
+        resultsLoader.exec()
+        resultsLoader = None
 
     def getWidgetByID(self, ID: int = 0) -> QWidget:
         for i in self.windows:
