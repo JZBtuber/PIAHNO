@@ -1,5 +1,6 @@
 GlobalSettings = { #General settings of the app
     "participantName" : "",
+    "TestName" : "",
     "pathToWorkingDir" : "",
     "detectionConfidence" : 0.90,
     "trackingConfidence" : 0.90,

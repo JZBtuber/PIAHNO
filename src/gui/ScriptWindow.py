@@ -41,6 +41,7 @@ array = {"Score" : 512, # <-- "Score" must be the key to the score variable
 data = pickle.dumps(array)
 sys.stdout.buffer.write(data)"""
 
+
 class ScriptBox(QDialog):
     """
     Dialog for the use of the outside scripts.
@@ -101,24 +102,24 @@ class ScriptBox(QDialog):
         Create all the different widgets to add inputs files to the script.\n
         :param `QGridLayout` inputLayout: Layout object that will be filled with the widgets.
         """
-        #Set layout settings
+        # Set layout settings
         inputLayout.setRowStretch(0, 0)
         inputLayout.setRowStretch(1, 0)
 
-        #Input Label
+        # Input Label
         topText = QLabel("Input files")
-        topText.setAlignment(Qt.AlignmentFlag.AlignHCenter)        
+        topText.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        #Add file button
+        # Add file button
         addButton = QPushButton("Add file")
         addButton.clicked.connect(self._browseFiles)
 
-        #Remove file button
+        # Remove file button
         removeButton = QPushButton("Remove file")
         removeButton.clicked.connect(lambda: self._removeFileWidget(
             self.filePathsWidgets[-1]) if self.filePathsWidgets else "")
 
-        #Scroll area
+        # Scroll area
         self.fileContainer = QVBoxLayout()
         self.fileContainer.addStretch()
         fileContentWidget = QWidget()
@@ -138,7 +139,7 @@ class ScriptBox(QDialog):
         Add a file to the list of file to give as arguments to the script.\n
         :param `str` path: Path to the file to add as argument.
         """
-        #Set the text settings
+        # Set the text settings
         text = QLabel(path)
         text.setObjectName("text")
         text.setStyleSheet("""
@@ -151,8 +152,8 @@ class ScriptBox(QDialog):
                             """)
         text.contextMenuEvent = lambda event, widget=text: self.fileContextMenuEvent(
             event, widget)
-        
-        #Add the text widget to the scroll area and list
+
+        # Add the text widget to the scroll area and list
         self.filePathsWidgets.append(text)
         self.fileContainer.addWidget(text, 0, Qt.AlignmentFlag.AlignTop)
 
@@ -162,16 +163,16 @@ class ScriptBox(QDialog):
         :param `QLabel` widget: Label object that will be removed.\n
         :raises: `ValueError` if widget doesn't exist in the lists.
         """
-        if widget not in self.filePathsWidgets: 
+        if widget not in self.filePathsWidgets:
             raise ValueError("widget is not in the saved widgets")
 
-        #Remove the widget from the scroll area and the list
+        # Remove the widget from the scroll area and the list
         self.filePathsWidgets.remove(widget)
         self.fileContainer.removeWidget(widget)
         widget.deleteLater()
 
     def _browseFiles(self) -> None:
-        #Look for a tretable file type
+        # Look for a tretable file type
         paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Select an input files",
@@ -189,15 +190,15 @@ class ScriptBox(QDialog):
         """
         contextMenu = QMenu(self)
 
-        #Add options to the context menu
+        # Add options to the context menu
         showAction = contextMenu.addAction("Show file")
         contextMenu.addSeparator()
         removeAction = contextMenu.addAction("Remove")
 
-        #Set the context menu position from the event
+        # Set the context menu position from the event
         action = contextMenu.exec(event.globalPos())
 
-        #User's options on the context menu
+        # User's options on the context menu
         if action == showAction:
             _, _ = QFileDialog.getOpenFileName(self,
                                                "Select an input file",
@@ -216,24 +217,24 @@ class ScriptBox(QDialog):
         Create all the different widgets to add scripts to use.\n
         :param `QGridLayout` inputLayout: Layout object that will be filled with the widgets.
         """
-        #Set layout settings
+        # Set layout settings
         scriptLayout.setRowStretch(0, 0)
         scriptLayout.setRowStretch(1, 0)
 
-        #Script labal
+        # Script labal
         topText = QLabel("Scripts")
         topText.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        #Add script button
+        # Add script button
         addButton = QPushButton("Add script")
         addButton.clicked.connect(self._browseScripts)
 
-        #Remove script button
+        # Remove script button
         removeButton = QPushButton("Remove script")
         removeButton.clicked.connect(lambda: self._removeScriptWidget(
             self.scriptPathsWidgets[-1]) if self.scriptPathsWidgets else "")
-        
-        #Scroll area
+
+        # Scroll area
         self.scriptContainer = QVBoxLayout()
         self.scriptContainer.addStretch()
         scriptContentWidget = QWidget()
@@ -253,7 +254,7 @@ class ScriptBox(QDialog):
         Add a script to the list of script that can be used.\n
         :param `str` path: Path to the script to run.
         """
-        #Set the text settings
+        # Set the text settings
         text = QLabel(path)
         text.setObjectName("text")
         text.setStyleSheet("""
@@ -266,8 +267,8 @@ class ScriptBox(QDialog):
                             """)
         text.contextMenuEvent = lambda event, widget=text: self._scriptContextMenuEvent(
             event, widget)
-        
-        #Add the text widget to the scroll area and list
+
+        # Add the text widget to the scroll area and list
         self.scriptPathsWidgets.append(text)
         self.scriptContainer.addWidget(text, 0, Qt.AlignmentFlag.AlignTop)
 
@@ -279,14 +280,14 @@ class ScriptBox(QDialog):
         """
         if widget not in self.scriptPathsWidgets:
             raise ValueError("widget is not in the saved widgets")
-        
-        #Remove the widget from the scroll area and the list
+
+        # Remove the widget from the scroll area and the list
         self.scriptPathsWidgets.remove(widget)
         self.scriptContainer.removeWidget(widget)
         widget.deleteLater()
 
     def _browseScripts(self) -> None:
-        #Look for a usable script
+        # Look for a usable script
         paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Select an script files",
@@ -305,17 +306,17 @@ class ScriptBox(QDialog):
         """
         contextMenu = QMenu(self)
 
-        #Add options to the context menu
+        # Add options to the context menu
         useAction = contextMenu.addAction("Use script")
         contextMenu.addSeparator()
         showAction = contextMenu.addAction("Show file")
         contextMenu.addSeparator()
         removeAction = contextMenu.addAction("Remove")
 
-        #Set the context menu position from the event
+        # Set the context menu position from the event
         action = contextMenu.exec(event.globalPos())
 
-        #User's options on the context menu
+        # User's options on the context menu
         if action == showAction:
             _, _ = QFileDialog.getOpenFileName(self,
                                                "Select an script file",
@@ -337,7 +338,7 @@ class ScriptBox(QDialog):
         :param `QGridLayout` controlLayout: Layout object that will be filled with the control widgets.
         """
 
-        #Set layout settings
+        # Set layout settings
         for i in range(14):
             if i == 3:
                 controlLayout.setRowStretch(i, 3)
@@ -346,13 +347,13 @@ class ScriptBox(QDialog):
             else:
                 controlLayout.setRowStretch(i, 0)
 
-        #Control label
+        # Control label
         topText = QLabel("Script controls")
         topText.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         topText.setSizePolicy(QSizePolicy.Policy.Minimum,
                               QSizePolicy.Policy.Minimum)
 
-        #Chosen script label
+        # Chosen script label
         self.scriptLabel = QLabel("")
         self.scriptLabel.setObjectName("scriptLabel")
         self.scriptLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -365,8 +366,8 @@ class ScriptBox(QDialog):
                                   border-width : 1px;
                                   border-radius : 2px;
                                   }""")
-        
-        #Score label
+
+        # Score label
         self.scoreLabel = QLabel(f"Score:\n {self.score}")
         self.scoreLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scoreLabel.setObjectName("scoreLabel")
@@ -377,12 +378,12 @@ class ScriptBox(QDialog):
                                       color :  #FFFF00;
                                       }
                                       """)
-        
-        #Start script button
+
+        # Start script button
         startButton = QPushButton("Start")
         startButton.clicked.connect(self._start)
 
-        #Figure canvas
+        # Figure canvas
         self.canvas = FigureCanvasQTAgg(Figure(figsize=(4, 4)))
         self.canvas.setFixedSize(600, 350)
         self.canvasContainer = QWidget()
@@ -390,43 +391,44 @@ class ScriptBox(QDialog):
         canvasLayout.setContentsMargins(0, 0, 0, 0)
         canvasLayout.addWidget(
             self.canvas, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        #Last figure button
+
+        # Last figure button
         self.lastButton = QPushButton("Last figure")
         self.lastButton.setEnabled(False)
         self.lastButton.clicked.connect(lambda: self._loadPicture(True))
 
-        #Next figure button
+        # Next figure button
         self.nextButton = QPushButton("Next figure")
         self.nextButton.setEnabled(False)
         self.nextButton.clicked.connect(lambda: self._loadPicture(False))
 
-        #Figure counter label
+        # Figure counter label
         self.figureCounter = QLabel(
             f"Figure {self.loadedPlot}/{len(self.figures)}")
-        
-        #Export figure button
+
+        # Export figure button
         exportButton = QPushButton("Export figure as png")
         exportButton.clicked.connect(self._exportPNG)
 
-        #Export template button
+        # Export template button
         templateButton = QPushButton("Export python template")
         templateButton.clicked.connect(self._writeTemplate)
-        
-        #Create the value table
+
+        # Create the value table
         self._createTable()
 
-        #Save the result button
+        # Save the result button
         saveResultsButton = QPushButton("Save the test's results")
         saveResultsButton.clicked.connect(self._saveResults)
 
-        #Add all widgets to the layout
+        # Add all widgets to the layout
         controlLayout.addWidget(topText, 0, 0, 1, 2)
         controlLayout.addWidget(self.scriptLabel, 1, 0, 1, 2)
         controlLayout.addWidget(self.scoreLabel, 2, 0, 1, 2)
         controlLayout.addWidget(self.table, 3, 0, 2, 2)
         controlLayout.addWidget(self.canvasContainer, 5, 0, 2, 2)
-        controlLayout.addWidget(self.figureCounter, 7, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        controlLayout.addWidget(self.figureCounter, 7,
+                                0, 1, 2, Qt.AlignmentFlag.AlignCenter)
         controlLayout.addWidget(exportButton, 8, 0, 1, 2)
         controlLayout.addWidget(self.lastButton, 9, 0, 1, 1)
         controlLayout.addWidget(self.nextButton, 9, 1, 1, 1)
@@ -438,34 +440,34 @@ class ScriptBox(QDialog):
         """
         Start the script with the input files and gets the result.
         """
-        #Reset default values
+        # Reset default values
         self.values = []
         self.figures = []
         self.table.clearContents()
         self.testName = os.path.basename(self.chosenScript)
         self.loadedPlot = 0
 
-        #Dissable figure control buttons
+        # Dissable figure control buttons
         self.lastButton.setEnabled(False)
         self.nextButton.setEnabled(False)
 
-        #Gets all curent file paths
+        # Gets all curent file paths
         filepaths = []
         for widget in self.filePathsWidgets:
             filepaths.append(widget.text())
 
-        #Try to run the script and get the results
+        # Try to run the script and get the results
         try:
             self.data = pickle.loads(
                 getScore(self.chosenScript, filepaths).stdout)
             results = self.data
         except Exception as e:
-            #On failure, clean up and return
+            # On failure, clean up and return
             print(str(e))
             self.scoreLabel.setText("FAILED")
             return
 
-        #Puts the result in the right list by result type (score, value, plot or time)
+        # Puts the result in the right list by result type (score, value, plot or time)
         for result in results:
             if result == "Score":
                 self.score = results[result]
@@ -475,15 +477,17 @@ class ScriptBox(QDialog):
             elif not result.lower().startswith("time"):
                 self.values.append((result, results[result]))
 
-        #Show a plot if the results contain any
+        # Show a plot if the results contain any
         if self.figures:
             self._showFigure(0)
             self.nextButton.setEnabled(len(self.figures) > 1)
-            self.figureCounter.setText(f"Figure {self.loadedPlot + 1}/{len(self.figures)}")
+            self.figureCounter.setText(
+                f"Figure {self.loadedPlot + 1}/{len(self.figures)}")
         else:
-            self.figureCounter.setText(f"Figure {self.loadedPlot}/{len(self.figures)}")
+            self.figureCounter.setText(
+                f"Figure {self.loadedPlot}/{len(self.figures)}")
 
-        #Show values if the results contain any
+        # Show values if the results contain any
         if self.values:
             self._fillTable()
         else:
@@ -502,7 +506,7 @@ class ScriptBox(QDialog):
         """
         Override of the hidding event.
         """
-        #Save the cripts
+        # Save the cripts
         paths = [widget.text() for widget in self.scriptPathsWidgets]
         saveScripts(paths)
 
@@ -514,15 +518,15 @@ class ScriptBox(QDialog):
         :param `bool` back: Go backward through the list, defaults to `False`\n
         :raises: `ValueError` If there are no plots in `figures` to load.
         """
-        #Guard clause for empty figures
+        # Guard clause for empty figures
         if not self.figures:
             raise ValueError("No figure to load!")
 
-        #Load the next/last plot
+        # Load the next/last plot
         self.loadedPlot += -1 if back else 1
         self._showFigure(self.loadedPlot)
 
-        #Button and label managment
+        # Button and label managment
         self.lastButton.setEnabled(self.loadedPlot > 0)
         self.nextButton.setEnabled(self.loadedPlot < len(self.figures) - 1)
         self.figureCounter.setText(
@@ -534,29 +538,29 @@ class ScriptBox(QDialog):
         :param `int` index: Index of the figure to show, defaults to `0`.\n
         :raises: `ValueError` if `figures` does not have this index.
         """
-        #Guard clause if the index is too high
+        # Guard clause if the index is too high
         if index > len(self.figures):
             raise ValueError("No figures at this index")
 
-        #Backup the old canvas for future deletion
+        # Backup the old canvas for future deletion
         old_canvas = self.canvas
 
-        #Set figure defaults
+        # Set figure defaults
         fig = self.figures[index]
         fig.set_size_inches(3, 3)
         fig.set_dpi(100)
         fig.tight_layout(pad=0.5)
 
-        #Set canvas defaults
+        # Set canvas defaults
         self.canvas = FigureCanvasQTAgg(fig)
         self.canvas.setFixedSize(600, 350)
 
-        #Removes the old canvas
+        # Removes the old canvas
         layout = self.canvasContainer.layout()
         layout.removeWidget(old_canvas)
         old_canvas.deleteLater()
 
-        #Add the new canvas
+        # Add the new canvas
         layout.addWidget(self.canvas, alignment=Qt.AlignmentFlag.AlignCenter)
         self.canvas.draw()
 
@@ -564,10 +568,10 @@ class ScriptBox(QDialog):
         """
         Export the current plos as a png file.
         """
-        #Gets the current loaded plot
+        # Gets the current loaded plot
         figure = self.figures[self.loadedPlot]
 
-        #User chooses the saving location
+        # User chooses the saving location
         filePath, _ = QFileDialog.getSaveFileName(
             self,
             "Save plot",
@@ -581,7 +585,7 @@ class ScriptBox(QDialog):
         """
         Export the script template to files.
         """
-        #User chooses the saving location
+        # User chooses the saving location
         filePath = QFileDialog.getExistingDirectory(
             self,
             "Select a directory",
@@ -617,14 +621,14 @@ class ScriptBox(QDialog):
         Save the results of the script to a pickle file.\n
         :raises: `ValueError` if there is no time data in the results.
         """
-        #Guard clause if there is no time data
+        # Guard clause if there is no time data
         if "Time" not in self.data:
             raise ValueError("No time data in results")
 
-        #Save the TestName to the results
+        # Save the TestName to the results
         self.data["TestName"] = self.testName
 
-        #Custom paths generation
+        # Custom paths generation
         pathToFile = GlobalSettings["pathToWorkingDir"] if GlobalSettings["pathToWorkingDir"] else os.path.join(
             os.getcwd(), "Tests")
         filepath = f"{GlobalSettings["participantName"]}\\Results" if GlobalSettings["participantName"] else f"Results"
@@ -632,7 +636,7 @@ class ScriptBox(QDialog):
 
         os.makedirs(path, exist_ok=True)
 
-        #Write the data to the file
+        # Write the data to the file
         try:
             with open(os.path.join(path, f"{self.testName}_{self.data["Time"]}_results.pkl"), "wb") as file:
                 pickle.dump(self.data, file)
@@ -644,17 +648,18 @@ class ResultLoader(QDialog):
     """
     Dialog to load and plot the last results.
     """
+
     def __init__(self):
         super().__init__()
         self.setFixedSize(1200, 800)
 
-        #Set default variables
+        # Set default variables
         self.chosenResults = ""
         self.loadedPlot = 0
         self.figures = []
         self.dataSets = []
 
-        #Create the widget
+        # Create the widget
         self.makeWidget()
 
     def makeWidget(self) -> None:
@@ -669,7 +674,7 @@ class ResultLoader(QDialog):
         self.figureCounter = QLabel(
             f"Figure {self.loadedPlot}/{len(self.figures)}")
 
-        #Next and previous buttons
+        # Next and previous buttons
         self.lastButton = QPushButton("Last figure")
         self.lastButton.setEnabled(False)
         self.lastButton.clicked.connect(lambda: self._loadPicture(True))
@@ -678,30 +683,31 @@ class ResultLoader(QDialog):
         self.nextButton.setEnabled(False)
         self.nextButton.clicked.connect(lambda: self._loadPicture(False))
 
-        #Calculate button
+        # Calculate button
         calculateButton = QPushButton("Calculate")
-        calculateButton.clicked.connect(self.calculate)
-        
-        #Path Input
+        calculateButton.clicked.connect(self._calculate)
+
+        # Path Input
         self.pathInput = FileDropLineEdit()
         self.pathInput.setPlaceholderText("Path to the file...")
         self.pathInput.textChanged.connect(self._updateResults)
         self.pathInput.fileDropped.connect(self._updateResults)
 
-        #Browse button
+        # Browse button
         browseButton = QPushButton("Browse")
         browseButton.clicked.connect(self._browseFile)
 
-        #Path input layout
+        # Path input layout
         pathLayout = QHBoxLayout()
         pathLayout.addWidget(self.pathInput, 1)
         pathLayout.addWidget(browseButton, 0)
         pathLayout.addWidget(self.pathInput)
         pathLayout.addWidget(browseButton)
 
-        #Add the widget to the main layout
+        # Add the widget to the main layout
         self.mainLayout.addWidget(self.canvas, 0, 0, 4, 2)
-        self.mainLayout.addWidget(self.figureCounter, 4, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        self.mainLayout.addWidget(
+            self.figureCounter, 4, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
         self.mainLayout.addWidget(self.lastButton, 5, 0, 1, 1)
         self.mainLayout.addWidget(self.nextButton, 5, 1, 1, 1)
         self.mainLayout.addWidget(calculateButton, 6, 0, 1, 2)
@@ -718,19 +724,19 @@ class ResultLoader(QDialog):
         """
         Calculate and plot the difference between result sets.
         """
-        #Guard clause if the chosen results are empty
+        # Guard clause if the chosen results are empty
         if not self.chosenResults:
             return
 
-        #Get the dicts from the files and the files from the path
+        # Get the dicts from the files and the files from the path
         pathToFile = os.path.dirname(self.chosenResults)
         files = [os.path.join(pathToFile, f) for f in os.listdir(pathToFile)]
         dicts = self._getDicts(files)
 
-        #Index of the example file
+        # Index of the example file
         exempleIndex = 0
 
-        #Get the index of a file with the same test as the chosen result
+        # Get the index of a file with the same test as the chosen result
         try:
             with open(self.chosenResults, "rb") as file:
                 testName = (pickle.load(file))["TestName"]
@@ -741,13 +747,13 @@ class ResultLoader(QDialog):
         except Exception as e:
             print(e)
 
-        #Removes useless dictionnaries
+        # Removes useless dictionnaries
         dicts = self._getReleventDicts(dicts, exempleIndex)
         dicts = self._organizeDictsByTime(dicts)
 
         self._makePlots(dicts)
 
-        #draw the figures if there is any
+        # draw the figures if there is any
         if self.figures:
             self.loadedPlot = 0
             self._showFigure(0)
@@ -775,28 +781,27 @@ class ResultLoader(QDialog):
         :param `int` index: Index of the figure to show, defaults to `0`.\n
         :raises: `ValueError` if `figures` does not have this index.
         """
-        #Guard clause if the index is too high
+        # Guard clause if the index is too high
         if index > len(self.figures):
             raise ValueError("No figures at this index")
-        
-        #Keep a copy of the old canvas for deletion 
+
+        # Keep a copy of the old canvas for deletion
         old_canvas = self.canvas
 
-        #Set the figure settings
+        # Set the figure settings
         fig = self.figures[index]
         fig.set_size_inches(3, 3)
         fig.set_dpi(100)
         fig.tight_layout(pad=0.5)
 
-        #Set canvas
+        # Set canvas
         self.canvas = FigureCanvasQTAgg(fig)
-        
 
-        #Delete the old canvas
+        # Delete the old canvas
         self.mainLayout.removeWidget(old_canvas)
         old_canvas.deleteLater()
 
-        #Add new canvas
+        # Add new canvas
         self.mainLayout.addWidget(self.canvas, 0, 0, 4, 2)
         self.canvas.draw()
 
@@ -806,15 +811,15 @@ class ResultLoader(QDialog):
         :param `bool` back: Go backward through the list, defaults to `False`\n
         :raises: `ValueError` If there are no plots in `figures` to load.
         """
-        #Guard clause for empty figures
+        # Guard clause for empty figures
         if not self.figures:
             raise ValueError("No figure to load!")
 
-        #Load the next/last plot
+        # Load the next/last plot
         self.loadedPlot += -1 if back else 1
         self._showFigure(self.loadedPlot)
 
-        #Button and label managment
+        # Button and label managment
         self.lastButton.setEnabled(self.loadedPlot > 0)
         self.nextButton.setEnabled(self.loadedPlot < len(self.figures) - 1)
         self.figureCounter.setText(
@@ -852,19 +857,19 @@ class ResultLoader(QDialog):
         """
         releventDicts = []
 
-        #Guard clause if there is no dictionnary
+        # Guard clause if there is no dictionnary
         if not dicts:
             raise ValueError("No dictionnaries to check")
-        
-        #Guard clause if the exmpleIdex is out of range
+
+        # Guard clause if the exmpleIdex is out of range
         if exempleIndex > len(dicts) - 1:
             raise ValueError("ExempleIndex too high")
 
-        #Get the text done
+        # Get the text done
         exemple = dicts[exempleIndex]
         test = exemple["TestName"]
 
-        #Compare the test done to all dicts
+        # Compare the test done to all dicts
         for dict_ in dicts:
             if dict_["TestName"] == test:
                 releventDicts.append(dict_)
@@ -880,13 +885,13 @@ class ResultLoader(QDialog):
         :rtype: `list[dict]`\n
         :raises: `ValueError` if `dicts` has no dictionnaries.\n
         """
-        #Guard clause if there is no dictionnary
+        # Guard clause if there is no dictionnary
         if not dicts:
             raise ValueError("No dictionnaries to check")
-        
+
         n = len(dicts)
 
-        #Bubble sort by time
+        # Bubble sort by time
         for i in range(n):
             swapped = False
             for j in range(0, n - i - 1):
@@ -905,15 +910,15 @@ class ResultLoader(QDialog):
         :param `list[dict]` dicts: Dictionnaries to plot.\n
         :raises: `ValueError` if `dicts` has no dictionnaries.\n
         """
-        #Clear old plots
+        # Clear old plots
         plt.close("all")
         self.figures = []
 
-        #Guard clause if there is no dictionnary
+        # Guard clause if there is no dictionnary
         if not dicts:
             raise ValueError("No dictionnaries to check")
-        
-        #Removes the "TestName" and "plot" keys
+
+        # Removes the "TestName" and "plot" keys
         for dict_ in dicts:
             keys = dict_.keys()
             keysToRemove = []
@@ -924,7 +929,7 @@ class ResultLoader(QDialog):
             for key in keysToRemove:
                 dict_.pop(key, None)
 
-        #Draws the plots for each value
+        # Draws the plots for each value
         for i in range(len(dicts[0]) - 1):
             figure, x = plt.subplots()
             nextKey = list(dicts[0].keys())[i]
