@@ -634,8 +634,12 @@ class SettingBox(QDialog):
         super().__init__()
         self.setFixedSize(1000, 800)
 
+        # Flags
+        self.addFlag = None
+
         # Keep a temporary copy until the user saves
         settings = copy.deepcopy(mainSettings)
+        self.participants = []
 
         # Create the close button
         closeButton = QPushButton("Save and close")
@@ -647,15 +651,10 @@ class SettingBox(QDialog):
         layout = QVBoxLayout()
 
         # Code name of the patient
-        nameInput = QLineEdit()
-        nameInput.setPlaceholderText("Code name")
-        nameInput.setText(settings["participantName"])
-        nameInput.textChanged.connect(
-            lambda text: settings.__setitem__("participantName", text))
-
+        scroll = self._getParticipantNamesWidget(settings)
         layout.addLayout(self._addSetting("Code name of the test subject",
                                           "Set the code name under which the recorded files will be saved",
-                                          nameInput), 0)
+                                          scroll), 1)
 
         # Path to the recording directory
         self.dirInput = QLineEdit()
@@ -729,6 +728,10 @@ class SettingBox(QDialog):
         # Depth camera options
         self.checkZed(settings, layout)
 
+        # Add participants to the scroll bar
+        for participant in settings["participantNames"]:
+            self._addParticipant(self.scroll, participant)
+
         # Add empty space at the bottom of the settings
         layout.addStretch()
 
@@ -778,10 +781,9 @@ class SettingBox(QDialog):
         layout.addWidget(nameLabel, 0)
         layout.addWidget(descriptionLabel, 0)
         widget.setSizePolicy(QSizePolicy.Policy.Fixed,
-                             QSizePolicy.Policy.Fixed)
-        widget.setMinimumSize(100, 25)
-        widget.setMaximumSize(600, 40)
-        layout.addWidget(widget, 0)
+                             QSizePolicy.Policy.MinimumExpanding)
+        widget.setMaximumSize(650, 500)
+        layout.addWidget(widget, 1)
         layout.setContentsMargins(0, 10, 0, 10)
 
         return layout
@@ -811,7 +813,7 @@ class SettingBox(QDialog):
 
         layout.addLayout(self._addSetting("Use depth cameras",
                                           "Make the use of Zed depth camera available when recording",
-                                          zedCheckBox), 0)
+                                          zedCheckBox), 1)
 
         # Minimum depth
         zedMinDepth = QDoubleSpinBox()
@@ -920,6 +922,10 @@ class SettingBox(QDialog):
         :param mainSettings: Main settings dictionary to update.
         """
         # Save the temporary settings into the main settings
+        settings["participantNames"] = [participant.text()
+                                        for participant in self.participants]
+        settings["participantName"] = self.participantName.text()
+
         mainSettings.clear()
         mainSettings.update(settings)
 
@@ -958,3 +964,169 @@ class SettingBox(QDialog):
         except ImportError:
             return False
         return True
+
+    def _getParticipantNamesWidget(self, settings: dict) -> QVBoxLayout:
+        """
+        Get a widget containing the option to chose the participant.\n
+        :param `dict` settings: Settings of the app in a dictionary.
+        :returns: A widget containing the names of participants.
+        :rtype: `QVBoxLayout`
+        """
+        
+        self.scroll = QVBoxLayout()
+        mainWidget = QWidget()
+
+        #Container widget settings
+        containerWidget = QWidget()
+        containerWidget.setLayout(self.scroll)
+        containerWidget.setMaximumWidth(540)
+
+        #Create the scroll area and settings
+        scrollArea = QScrollArea()
+        scrollArea.setWidgetResizable(True)
+        scrollArea.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scrollArea.setWidget(containerWidget)
+        
+        #button to add a new participant
+        addButton = QPushButton("Add")
+        addButton.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        addButton.clicked.connect(lambda: self._addParticipant(self.scroll))
+
+        #Button to remove the selected participant
+        removeButton = QPushButton("Remove")
+        removeButton.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        removeButton.clicked.connect(self._removeParticipant)
+
+        #Label for the selected participant
+        self.participantName = QLabel(settings["participantName"])
+        self.participantName.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        #Create the participant layout and set settings
+        participantLayout = QGridLayout()
+        participantLayout.setColumnStretch(0, 1)
+        participantLayout.setColumnStretch(1, 1)
+        participantLayout.setRowStretch(0, 0)
+        participantLayout.setRowStretch(1, 1)
+        participantLayout.setRowStretch(2, 1)
+
+        #Add the widget to the layout
+        participantLayout.addWidget(self.participantName, 0, 0, 1, 1)
+        participantLayout.addWidget(scrollArea, 1, 0, 2, 1)
+        participantLayout.addWidget(addButton, 1, 1, 1, 1)
+        participantLayout.addWidget(removeButton, 2, 1, 1, 1)
+
+        #Set the scroll area settings
+        scrollArea.setSizePolicy(QSizePolicy.Policy.Fixed,
+                                 QSizePolicy.Policy.MinimumExpanding)
+        scrollArea.setMaximumSize(650, 400)
+        scrollArea.setMinimumSize(650, 300)
+
+        #return a layout
+        mainWidget.setLayout(participantLayout)
+        return mainWidget
+
+    def _addParticipant(self, layout: QVBoxLayout, name: str = "") -> None:
+        """
+        Add a participant to the list available.\n
+        :param `QVBoxLayout` layout: Layout to add the created layout to.
+        :param `str` name: Name of the participant to not ask.
+        """
+        #Guard clause if the button is clicked twice
+        if self.addFlag:
+            layout.removeWidget(self.addFlag)
+            self.addFlag = None
+            return
+        
+        #Set the settings for the layout.
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        #Guard clause for if the name is given. Directly add the label
+        if name:
+            self._addLabel(layout, name)
+            return
+
+        
+        #Inputs for the name input.
+        addButton = QPushButton("Add")
+        inputLineEdit = QLineEdit()
+        addButton.clicked.connect(
+            lambda: self._addLabel(layout, inputLineEdit.text()))
+
+        #layout for the inputs
+        addLayout = QHBoxLayout()
+        addLayout.addWidget(inputLineEdit, 0)
+        addLayout.addWidget(addButton, 0)
+
+        #Container widget for the layout
+        container = QWidget()
+        container.setLayout(addLayout)
+
+        layout.addWidget(container)
+
+        self.addFlag = container
+
+    def _addLabel(self, layout: QVBoxLayout, name: str) -> None:
+        """
+        Add a label to the `layout` parameter with the `name` text.\n
+        :param `QVBoxLayout` layout: Layout to which the label will be added.
+        :param `str` name: Name to add to the list
+        """
+        #Remove the add layout if it already exist.
+        if self.addFlag:
+            layout.removeWidget(self.addFlag)
+            self.addFlag = None
+
+        #If the name is empty, returns
+        if not name:
+            return
+
+        #Create and set the label's settings
+        nameLabel = QLabel(name)
+        nameLabel.setObjectName("nameLabel")
+        nameLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        nameLabel.setStyleSheet("""
+                                QLabel#nameLabel {
+                                border-width: 1px;
+                                border-style : solid;
+                                font-weight : bold;
+                                }""")
+        nameLabel.mousePressEvent = lambda _: self._updateChosenName(nameLabel)
+
+        #Add the label to the list
+        layout.addWidget(nameLabel)
+        self.participants.append(nameLabel)
+
+        #If the list is empty, set the name as chosen
+        if not self.participantName.text():
+            self.participantName.setText(name)
+
+    def _updateChosenName(self, label: QLabel) -> None:
+        """
+        Update the chosen name's label.
+        :param `QLabel` label: Label to add to the list.
+        """
+        self.participantName.setText(label.text())
+
+    def _removeParticipant(self) -> None:
+        """
+        Remove the chosen participant's label.
+        """
+        current_name = self.participantName.text()
+
+        #Remove the label with the same name as chosen
+        for label in self.participants:
+            if label.text() == current_name:
+                self.scroll.removeWidget(label)
+                label.setParent(None)
+                label.deleteLater()
+                self.participants.remove(label)
+                break
+        
+        #Change the chosen name
+        if self.participants:
+            self.participantName.setText(self.participants[0].text())
+        else:
+            self.participantName.setText("")
