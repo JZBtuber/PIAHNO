@@ -73,8 +73,6 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # Set the window defaults
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.contextMenu)
         self.setWindowTitle("Data Colector")
         self.setMinimumSize(QSize(600, 400))
         self.showMaximized()
@@ -168,15 +166,8 @@ class MainWindow(QMainWindow):
         """
         # Create the menu bar categories
         menu = self.menuBar()
-        fileMenu = menu.addMenu("&Files")
         editMenu = menu.addMenu("&Edit")
         toolMenu = menu.addMenu("&Tools")
-
-        # Add file menu actions
-        fileMenu.addActions([QAction("Save", self),
-                             QAction("Load", self),
-                             QAction("Export", self)
-                             ])
 
         # Add edit menu actions
         editMenu.addActions([QAction("Settings", self),
@@ -371,17 +362,6 @@ class MainWindow(QMainWindow):
                             if hasattr(j.widget.worker, "running"):
                                 if j.widget.worker.running:
                                     j.widget.setRecord(False)
-
-    # ---------------------------------------------------
-    # Context menu
-    # ---------------------------------------------------
-
-    def contextMenu(self):
-        """
-        Context menu event for the main window.
-        """
-        print("")
-        # make context menu here
 
     # ---------------------------------------------------
     # Tool dialogs
