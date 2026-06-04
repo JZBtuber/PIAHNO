@@ -180,8 +180,10 @@ class AudioWorker(basicWorker):
         self.frames = []  # list for recording data
 
         # making the path for the files
+        path = self.getRecordingPath()
         self.newPath = os.path.join(
-            self.getRecordingPath(), f"Audio_{self.ID}.wav")
+            path, f"Audio_{self.ID}.wav")
+        os.makedirs(path, exist_ok=True)
 
     def recordloop(self):
         """

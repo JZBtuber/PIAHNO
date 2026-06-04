@@ -289,6 +289,10 @@ class basicWorker(QObject):
             except Exception as e:
                 print(f"{type(self).__name__} crashed: {e}")
             finally:
+                recordThread = self.recordThread
+                if self.recordThread is not None and recordThread.isRunning():
+                    self.recordThread.wait()
+
                 self.finished.emit()
 
     # -----------------------------------------------------------
@@ -375,8 +379,7 @@ class basicWorker(QObject):
 
             self.recorder.finished.connect(self.recordThread.quit)
             self.recorder.finished.connect(self.recorder.deleteLater)
-            self.recorder.finished.connect(
-                self._recordThreadFinished, Qt.ConnectionType.DirectConnection)
+            self.recorder.finished.connect(self._recordThreadFinished)
             self.recordThread.finished.connect(self.recordThread.deleteLater)
 
             self.stopRecord.connect(
@@ -396,7 +399,6 @@ class basicWorker(QObject):
         """
         Clean up the recording thread references.
         """
-        print("Cleaned")
         self.recorder = None
         self.recordThread = None
         self.isRecording = False
