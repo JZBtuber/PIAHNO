@@ -9,9 +9,8 @@ from src.video.Zed import Zed
 import numpy as np
 import time
 import os
-import sys
 from src.gui.Core import *
-from datetime import datetime
+
 
 
 class VideoWorker(basicWorker):

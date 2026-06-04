@@ -177,7 +177,6 @@ class RecordingWorker(QObject):
 
         # Basic recording loop with init and closing
         try:
-            print("Init")
             self.initFunc()
 
             while self.running:
@@ -185,7 +184,6 @@ class RecordingWorker(QObject):
                 QThread.msleep(1)
 
         finally:
-            print("Stop")
             self.stopFunc()
             self.finished.emit()
 
@@ -735,7 +733,6 @@ class basicWindowWidget(QWidget):
         """
         # Guard clause if the worker is already running
         if self.thread is not None:
-            print("Returning")
             return
 
         # Set the input path to live or file mode
@@ -861,7 +858,6 @@ class basicWindowWidget(QWidget):
             self.path = self.livePath
         else:
             self.path = self.filePath
-        print(self.path)
 
     def getDelay(self):
         """
@@ -897,7 +893,6 @@ class basicWindowWidget(QWidget):
         """
         Function used by child classes to connect their custom signals.
         """
-        print("Make all connections")
 
     def reloadDevices(self):
         """

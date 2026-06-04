@@ -152,8 +152,6 @@ class MidiWorker(basicWorker):
         """
         Initialize MIDI recording data and output path.
         """
-        print("Init record")
-
         # Create the recording path
         recordpath = self.getRecordingPath()
 
