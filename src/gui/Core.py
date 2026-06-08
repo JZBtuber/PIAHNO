@@ -1,6 +1,6 @@
 from PyQt6.QtCore import pyqtSignal, QObject, pyqtSlot, QThread, Qt
 from PyQt6.QtWidgets import QFileDialog, QComboBox, QCheckBox, QLineEdit, QMessageBox, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from src.tools.fileIO import *
+from src.tools.fileIO import getDelayFromParent
 from pygrabber.dshow_graph import FilterGraph
 from datetime import datetime
 from src.tools.setting import GlobalSettings
@@ -435,25 +435,25 @@ class basicWorker(QObject):
             self.stopRecord.emit()
 
     @pyqtSlot(bool)
-    def mute(self, s) -> None:
+    def mute(self, s: bool) -> None:
         """
         Set the mute state.\n
-        :param s: New mute state.
+        :param `bool` s: New mute state.
         """
         self.muted = s
 
     @pyqtSlot(bool)
-    def setRecord(self, s) -> None:
+    def setRecord(self, s: bool) -> None:
         """
         Set the recording state.\n
-        :param s: New recording state.
+        :param `bool` s: New recording state.
         """
         self.record = s
 
-    def setDelayed(self, s) -> None:
+    def setDelayed(self, s: bool) -> None:
         """
         Set the delayed start state.\n
-        :param s: New delayed start state.
+        :param `bool` s: New delayed start state.
         """
         self.delayed = s
 

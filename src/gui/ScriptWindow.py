@@ -148,8 +148,7 @@ class ScriptBox(QDialog):
                            border-width : 1px;
                            border-radius : 3px;
                            margin : 2px;
-                           }
-                            """)
+                           }""")
         text.contextMenuEvent = lambda event, widget=text: self.fileContextMenuEvent(
             event, widget)
 
@@ -203,8 +202,7 @@ class ScriptBox(QDialog):
             _, _ = QFileDialog.getOpenFileName(self,
                                                "Select an input file",
                                                widget.text(),
-                                               "Input files (*.mp4 *.mov *.wav *.mid *.npy *.npz *.csv *.mat)"
-                                               )
+                                               "Input files (*.mp4 *.mov *.wav *.mid *.npy *.npz *.csv *.mat)")
         elif action == removeAction:
             self._removeFileWidget(widget)
 
@@ -898,7 +896,6 @@ class ResultLoader(QDialog):
                 if dicts[j]["Time"] > dicts[j + 1]["Time"]:
                     dicts[j], dict[j + 1] = dict[j + 1], dicts[j]
                     swapped == True
-
             if not swapped:
                 break
 

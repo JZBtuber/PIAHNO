@@ -1,6 +1,8 @@
 GlobalSettings = { #General settings of the app
     "participantName" : "",
-    "TestName" : "",
+    "testName" : {},
+    "participantNames" : [],
+    "testNames" : [],
     "pathToWorkingDir" : "",
     "detectionConfidence" : 0.90,
     "trackingConfidence" : 0.90,
