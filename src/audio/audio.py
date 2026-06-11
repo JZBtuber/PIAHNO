@@ -305,7 +305,7 @@ class AudioVisualizer(QWidget):
 
         # Set bar drawing options
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#4da3ff"))
+        painter.setBrush(QColor("#007bff"))
 
         # Draw each audio level bar
         x = margin

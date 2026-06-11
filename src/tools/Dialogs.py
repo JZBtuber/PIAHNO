@@ -34,25 +34,26 @@ class GetTestInformationDialog(QDialog):
     """
     Get information for a test.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.dict = {}
         
-        #Set window settings
+        # Set window settings
         self.setWindowTitle("Input script settings")
 
-        #Creating the buttons
+        # Creating the buttons
         QButton = (QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         self.buttonBox = QDialogButtonBox(QButton)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
+        # Inputs
+        WIP = QLabel("WIP")
+
+        # Layout
         layout = QVBoxLayout()
+        layout.addWidget(WIP)
         layout.addWidget(self.buttonBox)
-
-        
-
-
 
         self.setLayout(layout)
 

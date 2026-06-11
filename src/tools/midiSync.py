@@ -49,6 +49,7 @@ class MidiSync(QDialog):
         #Create MIDI path input
         self.midiInput = FileDropLineEdit()
         self.midiInput.setMinimumWidth(400)
+        self.midiInput.setPlaceholderText("Midi file...")
         midiBrouwseButton = QPushButton("Browse")
         midiBrouwseButton.clicked.connect(self.browseMidiFile)
 
@@ -61,6 +62,7 @@ class MidiSync(QDialog):
         #Create audio path input
         self.audioInput = FileDropLineEdit()
         self.audioInput.setMinimumWidth(400)
+        self.audioInput.setPlaceholderText("Audio file...")
         audioBrowseButton = QPushButton("Browse")
         audioBrowseButton.clicked.connect(self.browseAudioFile)
         

@@ -15,7 +15,6 @@ class MessageBox(QMessageBox):
     """
     Message box used to show errors to the user.
     """
-
     def __init__(self, Name: str, Message: str):
         """
         Create and show a warning message box.\n
@@ -29,7 +28,6 @@ class MessageBox(QMessageBox):
 
         # Set the available buttons (only OK)
         self.setStandardButtons(QMessageBox.StandardButton.Ok)
-        self.setDefaultButton(QMessageBox.StandardButton.Ok)
 
         self.setIcon(QMessageBox.Icon.Warning)  # Set the icon type
 
@@ -120,8 +118,6 @@ class FileDropLineEdit(QLineEdit):
         Set the text only if the path exists or if the text is empty.\n
         :param a0: Text or path to set in the line edit.
         """
-        message = None
-
         # Allow empty text
         if a0 == "":
             return super().setText(a0)
@@ -380,8 +376,7 @@ class basicWorker(QObject):
             self.recorder.finished.connect(self._recordThreadFinished)
             self.recordThread.finished.connect(self.recordThread.deleteLater)
 
-            self.stopRecord.connect(
-                self.recorder.stop, Qt.ConnectionType.DirectConnection)
+            self.stopRecord.connect(self.recorder.stop)
 
             self.recordThread.start()
             self.isRecording = True

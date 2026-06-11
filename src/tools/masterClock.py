@@ -23,10 +23,10 @@ class MasterClock(QObject):
         self.released_ids: dict[int, int] = {}
 
         #Set clock variables
-        self.startTime        = None
-        self.pauseTime        = None
-        self.totalPausedTime  = 0.0
-        self.paused           = False
+        self.startTime = None
+        self.pauseTime = None
+        self.totalPausedTime = 0.0
+        self.paused = False
 
         # Collect all live widgets
         for row in self.windows:
@@ -80,10 +80,10 @@ class MasterClock(QObject):
             self.released_ids[w.ID] = shifted
 
         #Start the master clock
-        self.startTime       = time.perf_counter()
+        self.startTime = time.perf_counter()
         self.totalPausedTime = 0.0
-        self.pauseTime       = None
-        self.paused          = False
+        self.pauseTime = None
+        self.paused = False
 
     # ------------------------------------------------------------------
     # Delay chain resolver
@@ -180,10 +180,10 @@ class MasterClock(QObject):
         #Start pause
         if paused and not self.paused:
             self.pauseTime = time.perf_counter()
-            self.paused    = True
+            self.paused = True
 
         #End pause
         elif not paused and self.paused:
             self.totalPausedTime += time.perf_counter() - self.pauseTime
             self.pauseTime = None
-            self.paused    = False
+            self.paused = False

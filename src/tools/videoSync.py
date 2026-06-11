@@ -59,6 +59,8 @@ class VideoSync(QDialog):
         self.midiPathInput  = FileDropLineEdit()
         self.videoPathInput.setMinimumWidth(400)
         self.midiPathInput.setMinimumWidth(400)
+        self.videoPathInput.setPlaceholderText("Video File...")
+        self.midiPathInput.setPlaceholderText("Midi file...")
 
         #Connect path input changes
         self.videoPathInput.textChanged.connect(self._setVideoPath)
@@ -71,13 +73,13 @@ class VideoSync(QDialog):
         midiBrowseBtn.clicked.connect(self._browseMidi)
 
         #Add path widgets to the grid
-        pathGrid.addWidget(videoLabel,          1, 0)
+        pathGrid.addWidget(videoLabel, 1, 0)
         pathGrid.addWidget(self.videoPathInput, 2, 0)
-        pathGrid.addWidget(videoBrowseBtn,      3, 0)
+        pathGrid.addWidget(videoBrowseBtn, 3, 0)
 
-        pathGrid.addWidget(midiLabel,           1, 1)
-        pathGrid.addWidget(self.midiPathInput,  2, 1)
-        pathGrid.addWidget(midiBrowseBtn,       3, 1)
+        pathGrid.addWidget(midiLabel, 1, 1)
+        pathGrid.addWidget(self.midiPathInput, 2, 1)
+        pathGrid.addWidget(midiBrowseBtn, 3, 1)
 
         mainLayout.addLayout(pathGrid)
 
@@ -99,10 +101,10 @@ class VideoSync(QDialog):
 
         #Create scrub steps
         steps = [
-            ("-1s",    -1000), ("-500ms", -500), ("-100ms", -100),
-            ("-50ms",   -50),  ("-10ms",   -10),
-            ("+10ms",   +10),  ("+50ms",   +50), ("+100ms", +100),
-            ("+500ms", +500),  ("+1s",    +1000),
+            ("-1s", -1000), ("-500ms", -500), ("-100ms", -100),
+            ("-50ms", -50),  ("-10ms", -10),
+            ("+10ms", +10),  ("+50ms", +50), ("+100ms", +100),
+            ("+500ms", +500),  ("+1s", +1000)
         ]
 
         #Create one scrub button for each step

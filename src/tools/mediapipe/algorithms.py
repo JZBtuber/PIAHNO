@@ -163,7 +163,7 @@ class mediaWork():
             handData = []
 
             # Process every landmark
-            for id, landmark in enumerate(landmarks):
+            for _, landmark in enumerate(landmarks):
                 px = landmark.x * w
                 py = landmark.y * h
 

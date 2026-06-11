@@ -51,7 +51,7 @@ class KeyFrameWorker(QObject):
         self.pathToVideo = ""
         self.pathToPoint = ""
         self.fileFormat = ""
-        self.algorithm = mediaWork()
+        self.algorithm = None
         self.pcl = None
         self.cameraParameters = None
         self.pathToCameraParameters = ""
@@ -64,6 +64,9 @@ class KeyFrameWorker(QObject):
 
         #Open the video file
         capture = cv2.VideoCapture(self.pathToVideo)
+
+        #Create algorithms
+        self.algorithm = mediaWork()
 
         #Guard clause if the video cannot be opened
         if not capture.isOpened():
@@ -102,7 +105,6 @@ class KeyFrameWorker(QObject):
 
         #Process every frame
         while framesDone < frameNumber and capture.isOpened():
-
             ret, frame = capture.read()
 
             #Stop if the frame could not be read
@@ -113,13 +115,18 @@ class KeyFrameWorker(QObject):
             timestamp_ms = int(framesDone * 1000 / fps)
 
             #Get the current point cloud frame if available
-            if pointData:
+            if pointData is not None:
                 currentPcl = pointData[framesDone] if framesDone < len(pointData) else None
             else:
                 currentPcl = None
 
             #Get 3D points from the algorithm
-            data = self.algorithm.get3dpoints(frame, fps, currentPcl if currentPcl is not None else None, self.cameraParameters if self.cameraParameters is not None else None)
+            use3d = (True if currentPcl else False) and (True if self.cameraParameters else False)
+
+            if use3d:
+                data = self.algorithm.get3dpoints(frame, fps, currentPcl, self.cameraParameters )
+            else:
+                data = self.algorithm.get3dpoints(frame, fps)
 
             leftHand, rightHand = data
 
@@ -131,9 +138,6 @@ class KeyFrameWorker(QObject):
 
             #Add all valid hand points to the output rows
             for handName, handData in hands.items():
-                if len(handData) != 21:
-                    continue
-
                 if handName not in allRows:
                     allRows[handName] = []
 
@@ -144,14 +148,14 @@ class KeyFrameWorker(QObject):
                         y3d = point[3] if point[3] is not None else np.nan
                         z3d = point[4] if point[4] is not None else np.nan
 
-                        allRows[handName].append([
-                            framesDone,
-                            timestamp_ms,
-                            landmarkId,
-                            x3d,
-                            y3d,
-                            z3d
-                                    ])
+                    allRows[handName].append([
+                        framesDone,
+                        timestamp_ms,
+                        landmarkId,
+                        x3d,
+                        y3d,
+                        z3d
+                        ])
 
             #Update progress
             framesDone += 1
@@ -163,14 +167,16 @@ class KeyFrameWorker(QObject):
         #Save each hand track to the selected file format
         for trackId, rows in allRows.items():
             array = np.array(rows, dtype=np.float32)
-
-            if self.fileFormat == ".npy":
+            if self.fileFormat.__contains__(".npy"):
                 np.save(f"{newPath}_{trackId}.npy", array)
-            elif self.fileFormat == ".csv":
+            elif self.fileFormat.__contains__(".csv"):
                 np.savetxt(f"{newPath}_{trackId}.csv", array, delimiter=',')
-            elif self.fileFormat == ".mat":
+            elif self.fileFormat.__contains__(".mat"):
                 arraymat = {"array": array}
                 scipy.io.savemat(f"{newPath}_{trackId}.mat", arraymat)
+            else:
+                np.save(f"{newPath}_{trackId}.npy", array)
+
 
         #Signal that the worker is finished
         self.finished.emit()
@@ -277,7 +283,7 @@ class KeyFrameExporter(QDialog):
         self.pointPathInput = FileDropLineEdit()
         self.pointPathInput.textChanged.connect(self.setPathToPoints)
         self.pointPathInput.setMinimumWidth(400)
-        self.pointPathInput.setPlaceholderText("Point path...")
+        self.pointPathInput.setPlaceholderText("Point path... (optional)")
 
         pointBrowseButton = QPushButton("Browse")
         pointBrowseButton.clicked.connect(self.browsePointFile)
@@ -286,7 +292,7 @@ class KeyFrameExporter(QDialog):
         self.cameraPathInput = FileDropLineEdit()
         self.cameraPathInput.textChanged.connect(self.setPathToCamera)
         self.cameraPathInput.setMinimumWidth(400)
-        self.cameraPathInput.setPlaceholderText("Camera settings path...")
+        self.cameraPathInput.setPlaceholderText("Camera settings path... (optional)")
 
         cameraBrowseButton = QPushButton("Browse")
         cameraBrowseButton.clicked.connect(self.browseCameraFile)
@@ -314,7 +320,7 @@ class KeyFrameExporter(QDialog):
 
         #Create file type combo box
         self.fileTypeComboBox = QComboBox()
-        self.fileTypeComboBox.addItems([".npy", ".csv", ".mat"])
+        self.fileTypeComboBox.addItems(["Numpy array (.npy)", "Excel file (.csv)", "Matlab array (.mat)"])
 
         #Add controls to the main layout
         mainLayout.addWidget(self.fileTypeComboBox)
@@ -341,7 +347,7 @@ class KeyFrameExporter(QDialog):
         self.worker.setPathToCameraParameters(self.pathToCameraParameters)
 
         #Set the selected file format
-        self.worker.setFileFormat(self.fileTypeComboBox.currentText() if self.fileTypeComboBox.currentText() != "" else ".npy")
+        self.worker.setFileFormat(self.fileTypeComboBox.currentText() if self.fileTypeComboBox.currentText() else ".npy")
 
         #Connecting signals
         self.worker.frameCount.connect(self.getLoadingLayout)

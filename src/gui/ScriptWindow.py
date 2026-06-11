@@ -824,7 +824,7 @@ class ResultLoader(QDialog):
             f"Figure {self.loadedPlot + 1}/{len(self.figures)}")
 
     @staticmethod
-    def _getDicts(paths:  list[str]) -> list[dict]:
+    def _getDicts(paths: list[str]) -> list[dict]:
         """
         Get the dictionnaries for a list of pickle path.\n
         :param `list[str]` paths: List of path to unpickle and get the dictionnary.\n

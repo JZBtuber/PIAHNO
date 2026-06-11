@@ -48,8 +48,13 @@ class KeyWorker(basicWorker):
             self.rows = mat["array"]
 
         # Guard clause if the loaded data does not have the expected format
+        if self.rows is None:
+            raise ValueError("KeyFrame file could not be loaded.")
+
+        print(f"Loaded shape: {self.rows.shape}, ndim: {self.rows.ndim}")
+
         if self.rows.ndim != 2 or self.rows.shape[1] < 6:
-            raise ValueError("KeyFrame file has incorrect format.")
+            raise ValueError(f"KeyFrame file has incorrect format. Shape was {self.rows.shape}")
 
         # Format:
         # col 0 = frame index

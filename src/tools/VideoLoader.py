@@ -46,7 +46,7 @@ class VideoWorker(QObject):
         self.frameNumber = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = capture.get(cv2.CAP_PROP_FPS)   
+        fps = capture.get(cv2.CAP_PROP_FPS)
 
         #Send the total frame count to the dialog
         self.frameCount.emit(self.frameNumber)
@@ -63,7 +63,6 @@ class VideoWorker(QObject):
 
         #Process every video frame
         while self.frameCountDone < self.frameNumber and capture.isOpened():
-
             ret, frame = capture.read()
 
             #Stop if the frame could not be read
@@ -130,7 +129,6 @@ class VideoLoader(QDialog):
         self.mainLayout = QVBoxLayout()
         self.mainLayout.addLayout(self.optionsLayout)
         self.setLayout(self.mainLayout)
-
 
     def start(self):
         """
