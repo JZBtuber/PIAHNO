@@ -473,7 +473,7 @@ class SettingBox(QDialog):
         addButton = QPushButton("Add")
         inputLineEdit = QLineEdit()
         addButton.clicked.connect(
-            lambda: self._addLabel(layout, inputLineEdit.text()))
+            lambda: self._addParticipantLabel(layout, inputLineEdit.text()))
 
         # layout for the inputs
         addLayout = QHBoxLayout()

@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout,
                              QComboBox
                              )
 from src.tools.mediapipe.algorithms import mediaWork
-
 import numpy as np
 import scipy.io
 import cv2
@@ -335,6 +334,9 @@ class KeyFrameExporter(QDialog):
         """
         #Guard clause if the worker is already running
         if self.worker is not None:
+            return
+        
+        if self.videoPathInput.text() == "":
             return
 
         #Create the worker and thread

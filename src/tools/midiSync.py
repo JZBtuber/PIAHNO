@@ -162,7 +162,8 @@ class MidiSync(QDialog):
         Save the calculated delay for the selected MIDI and audio files.
         """
         #Write the delay to the parent delay file
-        setDelayForParent(self.midiInput.text(), self.audioInput.text(), self.workingPath, self.midiDelay)
+        if self.midiInput.text() != "" and self.audioInput.text() != "":
+            setDelayForParent(self.midiInput.text(), self.audioInput.text(), self.workingPath, self.midiDelay)
 
 
     def browseMidiFile(self):

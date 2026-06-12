@@ -1,6 +1,5 @@
 import subprocess
 
-
 def getFileType(path:str) -> str:
     """
     Returns the type of the file in the path.\n

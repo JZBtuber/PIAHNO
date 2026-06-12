@@ -438,6 +438,9 @@ class ScriptBox(QDialog):
         """
         Start the script with the input files and gets the result.
         """
+        if not self.chosenScript:
+            return
+        
         # Reset default values
         self.values = []
         self.figures = []
@@ -566,6 +569,9 @@ class ScriptBox(QDialog):
         """
         Export the current plos as a png file.
         """
+        if not self.figures:
+            return
+        
         # Gets the current loaded plot
         figure = self.figures[self.loadedPlot]
 
@@ -619,6 +625,9 @@ class ScriptBox(QDialog):
         Save the results of the script to a pickle file.\n
         :raises: `ValueError` if there is no time data in the results.
         """
+        if not self.data:
+            return
+
         # Guard clause if there is no time data
         if "Time" not in self.data:
             raise ValueError("No time data in results")
