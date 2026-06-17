@@ -1,6 +1,7 @@
 from src.gui.gui import Application
 import os
 import faulthandler
+import sys
 
 #----------------------------------------------------------------#
 # This code was writen by Justin Boileau
@@ -24,6 +25,11 @@ def main(): #Main App
 
     #Create and start the application
     app = Application(localPath)
+
+def exception_hook(exctype, value, traceback):
+    print(exctype, value, traceback)
+    sys.__excepthook__(exctype, value, traceback)
+    sys.excepthook = exception_hook
 
 
 if __name__ == "__main__":  #Do not run as module

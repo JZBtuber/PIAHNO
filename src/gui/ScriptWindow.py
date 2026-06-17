@@ -34,7 +34,7 @@ ax.bar([1,2,3,4,5,6,7,8,9,10], [1,2,3,4,5,5,4,3,2,1])
 array = {"Score" : 512, # <-- "Score" must be the key to the score variable
          "Value1" : 256, # <-- "Every thing else will go into the table...
          "Plot1" : figure, # <-- ...execpt "Plot" wich will go in a figure
-         "Time" : fileDate
+         "Time" : fileDate # <-- Time of the file creation
          }
 
 #Send data to the app

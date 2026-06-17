@@ -187,7 +187,7 @@ class mediaWork():
 
                         # Get point from numpy point cloud array
                         else:
-                            pointCloudValue = pcl[iy, ix]
+                            pointCloudValue = self.get_valid_pcl_point(pcl, ix, iy, radius=4)
 
                         # Save the 3D coordinates if valid
                         if pointCloudValue is not None:
@@ -231,8 +231,11 @@ class mediaWork():
 
                 # Process every landmark
                 for landmark in landmarks:
-                    coords = [landmark.x * w, landmark.y * h,
-                              landmark.x, landmark.y, landmark.z]
+                    coords = [landmark.x * w,
+                              landmark.y * h,
+                              landmark.x,
+                              landmark.y,
+                              landmark.z]
 
                     # Save landmark by handedness
                     if category_name == "Left":
@@ -302,3 +305,28 @@ class mediaWork():
                 )
 
         return annotated
+
+    def get_valid_pcl_point(self, pcl, ix, iy, radius=4):
+        h, w = pcl.shape[:2]
+        points = []
+
+        x0 = max(0, ix - radius)
+        x1 = min(w, ix + radius + 1)
+        y0 = max(0, iy - radius)
+        y1 = min(h, iy + radius + 1)
+
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                p = pcl[y, x]
+
+                tx = p[0]
+                ty = p[1]
+                tz = p[2]
+
+                if np.isfinite(tx) and np.isfinite(ty) and np.isfinite(tz):
+                    points.append([tx, ty, tz])
+
+        if len(points) == 0:
+            return None
+
+        return np.median(np.array(points, dtype=np.float32), axis=0)

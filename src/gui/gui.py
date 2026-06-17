@@ -15,7 +15,10 @@ class Application():
         :param localPath: Path to the local working directory.
         """
         # Create the main window
-        self.window = MainWindow(localPath)
+        try:
+            self.window = MainWindow(localPath)
+        except Exception as e:
+            print(e)
 
         # Show the main window
         self.window.show()

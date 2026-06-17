@@ -47,7 +47,7 @@ class FileDropLineEdit(QLineEdit):
         super().__init__()
 
         self.setAcceptDrops(True)  # Allows drag and drop on the widget
-        self.textChanged.connect(lambda x: self.setText(self.text()))
+        self.textChanged.connect(lambda: self.setText(self.text()))
 
     # -----------------------------------------------------------
     # Events to drag and drop files
@@ -376,7 +376,7 @@ class basicWorker(QObject):
             self.recorder.finished.connect(self._recordThreadFinished)
             self.recordThread.finished.connect(self.recordThread.deleteLater)
 
-            self.stopRecord.connect(self.recorder.stop)
+            self.stopRecord.connect(self.recorder.stop, Qt.ConnectionType.DirectConnection)
 
             self.recordThread.start()
             self.isRecording = True
@@ -676,7 +676,7 @@ class basicWindowWidget(QWidget):
         self.deviceComboBox = QComboBox()
         self.deviceComboBox.setPlaceholderText("Device to use")
         self.deviceComboBox.currentIndexChanged.connect(
-            lambda x: self.isLiveCheckbox.setChecked(True))
+            lambda: self.isLiveCheckbox.setChecked(True))
         self.getDevices(self.inputType)
 
         for device in self.devices:

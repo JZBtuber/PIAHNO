@@ -52,10 +52,10 @@ class SettingBox(QDialog):
                                           scroll), 1)
 
         # Test to use
-        test = self._getCurrentTestWidget(settings)
-        layout.addLayout(self._addSetting("Default test to use",
-                                          "Set the default test to use when using a script",
-                                          test), 1)
+        #test = self._getCurrentTestWidget(settings)
+        #layout.addLayout(self._addSetting("Default test to use",
+        #                                  "Set the default test to use when using a script",
+        #                                  test), 1)
 
         # Path to the recording directory
         self.dirInput = QLineEdit()
@@ -219,7 +219,7 @@ class SettingBox(QDialog):
         layout.addLayout(self._addSetting("Use depth cameras",
                                           "Make the use of Zed depth camera available when recording",
                                           zedCheckBox), 1)
-
+ 
         # Minimum depth
         zedMinDepth = QDoubleSpinBox()
         zedMinDepth.setValue(settings["zedDepthMin"])
@@ -466,7 +466,7 @@ class SettingBox(QDialog):
 
         # Guard clause for if the name is given. Directly add the label
         if name:
-            self._addLabel(layout, name)
+            self._addParticipantLabel(layout, name)
             return
 
         # Inputs for the name input.

@@ -147,8 +147,8 @@ class KeyFeed(basicWindowWidget):
             (1, 5, 6), (5, 6, 2), (6, 7, 2), (7, 8, 2),         # index
             (5, 9, 6), (9, 10, 3), (10, 11, 3), (11, 12, 3),    # middle
             (9, 13, 6), (13, 14, 4), (14, 15, 4), (15, 16, 4),  # ring
-            (13, 17, 6), (17, 18, 5), (18, 19, 5), (19, 20, 5),  # pinky
-            (0, 17, 6),                                 # palm edge
+            (13, 17, 6), (17, 18, 5), (18, 19, 5), (19, 20, 5), # pinky
+            (0, 17, 6),                                         # palm edge
         ]
 
         # Create the 3D view
@@ -266,7 +266,7 @@ class KeyFeed(basicWindowWidget):
         Create the 3D cylinders used to connect hand points.
         """
         # Create every hand connection cylinder
-        for _a, _b, _c in self.HAND_CONNECTIONS:
+        for _, _, _c in self.HAND_CONNECTIONS:
             entity = QEntity(self.root)
             material = QPhongMaterial(self.root)
             mesh = QCylinderMesh()
@@ -340,7 +340,7 @@ class KeyFeed(basicWindowWidget):
             self.sphere_transforms[i].setTranslation(p)
 
         # Update every bone
-        for bone_index, (a_idx, b_idx, c) in enumerate(self.HAND_CONNECTIONS):
+        for bone_index, (a_idx, b_idx, _) in enumerate(self.HAND_CONNECTIONS):
             self.updateBone(bone_index, vec_points[a_idx], vec_points[b_idx])
 
     def updateBone(self, bone_index: int, a: QVector3D, b: QVector3D):

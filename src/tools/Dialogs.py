@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QLineEdit, QFileDialog, QPushButton, QHBoxLayout
 
 class ConfirmRemoveDialog(QDialog):
     """
@@ -37,6 +37,7 @@ class GetTestInformationDialog(QDialog):
     def __init__(self) -> None:
         super().__init__()
         self.dict = {}
+        filesToLoad = []
         
         # Set window settings
         self.setWindowTitle("Input script settings")
@@ -48,15 +49,58 @@ class GetTestInformationDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
 
         # Inputs
-        WIP = QLabel("WIP")
+        nameLabel = QLabel("Name of the test")
+
+        self.nameInput = QLineEdit()
+        self.nameInput.setPlaceholderText("Name of the test...")
+
+        scriptLayout = QHBoxLayout()
+
+        self.scriptInput = QLineEdit()
+        self.scriptInput.setPlaceholderText("ScriptFile...")
+        self.scriptInput.setMinimumSize(400, 30)
+
+        scriptBrowseButton = QPushButton("Browse scripts")
+        scriptBrowseButton.clicked.connect(self.browseScripts)
+
+        scriptLayout.addWidget(self.scriptInput)
+        scriptLayout.addWidget(scriptBrowseButton)
 
         # Layout
         layout = QVBoxLayout()
-        layout.addWidget(WIP)
+        layout.addWidget(nameLabel)
+        layout.addWidget(self.nameInput)
+        layout.addLayout(scriptLayout)
+
         layout.addWidget(self.buttonBox)
+        
 
         self.setLayout(layout)
 
 
     def getDict(self) -> dict:
+        if not self.nameLabel.text():
+            return
+        
+        self.dict = {"name" : self.nameLabel.text(),
+                     "scriptPath" : self.scriptInput.text()}
+
         return self.dict
+    
+
+
+    def browseScripts(self):
+        """
+        Open a file dialog and set the selected script.
+        """
+        # User chooses the input file
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select a script",
+            "",
+            "Python Files (*.py);;All Files (*)"
+        )
+
+        # Set the path if a file was chosen
+        if path:
+            self.scriptInput.setText(path)

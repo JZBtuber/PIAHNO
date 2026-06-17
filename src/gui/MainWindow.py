@@ -211,8 +211,7 @@ class MainWindow(QMainWindow):
             for j, jData in enumerate(iData):
                 if jData.widget is None:
                     # Create the widget if a class was given
-                    widget = widgetClass(int(
-                        (i * 4 + j + 1)), self.localPath) if isinstance(widgetClass, type) else widgetClass
+                    widget = widgetClass(int((i * 4 + j + 1)), self.localPath) if isinstance(widgetClass, type) else widgetClass
 
                     # Save the widget data
                     jData.widget = widget
@@ -226,10 +225,10 @@ class MainWindow(QMainWindow):
                     self.windowAdded.emit(jData.widget)
                     return
 
-    def removeWindow(self, ID: int):
+    def removeWindow(self, ID: int = 0):
         """
         Remove a window from the main grid by its ID.\n
-        :param `int` ID: ID of the window to remove.
+        :param `int` ID: ID of the window to remove, defaults to `0`.
         """
         # Look for the widget with the requested ID
         for row in self.windows:
@@ -285,8 +284,7 @@ class MainWindow(QMainWindow):
         for row in self.windows:
             for widgetData in row:
                 if widgetData.widget is not None:
-                    widgetData.widget.start(
-                        masterClock=self.clock, delayed=True)
+                    widgetData.widget.start(masterClock=self.clock, delayed=True)
 
     def pauseALL(self):
         """
@@ -338,13 +336,21 @@ class MainWindow(QMainWindow):
         # Look through every widget
         for i in self.windows:
             for j in i:
-                if not j.widget == None:
-                    # Guard clauses for widgets that cannot record
-                    if hasattr(j.widget, "setRecord"):
-                        if hasattr(j.widget, "worker"):
-                            if hasattr(j.widget.worker, "running"):
-                                if j.widget.worker.running:
-                                    j.widget.setRecord(True)
+                if j.widget == None:
+                    continue
+                # Guard clauses for widgets that cannot record
+
+                if not hasattr(j.widget, "setRecord"):
+                    continue
+
+                if not hasattr(j.widget, "worker"):
+                    continue
+
+                if not hasattr(j.widget.worker, "running"):
+                    continue
+
+                if j.widget.worker.running:
+                    j.widget.setRecord(True)
 
     def stopRecordingALL(self):
         """
@@ -353,13 +359,21 @@ class MainWindow(QMainWindow):
         # Look through every widget
         for i in self.windows:
             for j in i:
-                if not j.widget == None:
-                    # Guard clauses for widgets that cannot record
-                    if hasattr(j.widget, "setRecord"):
-                        if hasattr(j.widget, "worker"):
-                            if hasattr(j.widget.worker, "running"):
-                                if j.widget.worker.running:
-                                    j.widget.setRecord(False)
+                if j.widget == None:
+                    continue
+                # Guard clauses for widgets that cannot record
+
+                if not hasattr(j.widget, "setRecord"):
+                    continue
+
+                if not hasattr(j.widget, "worker"):
+                    continue
+
+                if not hasattr(j.widget.worker, "running"):
+                    continue
+                
+                if j.widget.worker.running:
+                    j.widget.setRecord(False)
 
     # ---------------------------------------------------
     # Tool dialogs
@@ -445,8 +459,7 @@ class topMenu(QToolBar):
 
         # Set menu button descriptions
         self.menuButtons[0].setStatusTip("Manage files and systems")
-        self.menuButtons[1].setStatusTip(
-            "Edit and control the virtual environment")
+        self.menuButtons[1].setStatusTip("Edit and control the virtual environment")
 
         # Connect menu buttons
         self.menuButtons[0].triggered.connect(self.fileButtonClicked)
@@ -465,7 +478,7 @@ class WindowChoice(QDialog):
     Dialog used to add or remove feed windows from the main window.
     """
 
-    def __init__(self, MainWindow, windows=[]):
+    def __init__(self, MainWindow: MainWindow, windows: list):
         """
         Create the window choice dialog.\n
         :param MainWindow: Main window that will receive the add and remove requests.
@@ -592,10 +605,8 @@ class WindowChoice(QDialog):
                         id = window.getID()
                         button = QPushButton(f"{id}")
                         button.setMaximumSize(20, 20)
-                        button.clicked.connect(
-                            lambda checked=False, id=id: self.removeWindow(id))
-                        self.hor0.addWidget(
-                            button, 0 if id < 5 else 1, ((id - 1) % 4) + 1)
+                        button.clicked.connect(lambda _=False, id=id: self.removeWindow(id))
+                        self.hor0.addWidget(button, 0 if id < 5 else 1, ((id - 1) % 4) + 1)
 
                         self.buttons.append(button)
 

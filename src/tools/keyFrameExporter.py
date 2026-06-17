@@ -120,7 +120,7 @@ class KeyFrameWorker(QObject):
                 currentPcl = None
 
             #Get 3D points from the algorithm
-            use3d = (True if currentPcl else False) and (True if self.cameraParameters else False)
+            use3d = (True if currentPcl is not None else False) and (True if self.cameraParameters is not None else False)
 
             if use3d:
                 data = self.algorithm.get3dpoints(frame, fps, currentPcl, self.cameraParameters )
