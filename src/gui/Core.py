@@ -200,7 +200,7 @@ class basicWorker(QObject):
     stopRecord = pyqtSignal()
     pathError = pyqtSignal()
 
-    def __init__(self, path, isLive, delay=0):
+    def __init__(self, path: str, isLive: bool, delay: int= 0):
         """
         Create the base worker.\n
         :param path: File path or live device path used by the worker.
@@ -975,7 +975,7 @@ class basicWindowWidget(QWidget):
         # Get all midi input devices
         try:
             names = mido.get_input_names()
-            for i, name in enumerate(names):
+            for _, name in enumerate(names):
                 devices.append({
                     "id": name,      # keep the actual port name
                     "name": name

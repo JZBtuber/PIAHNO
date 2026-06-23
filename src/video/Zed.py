@@ -71,12 +71,6 @@ class Zed():
         # Create and set RuntimeParameters after opening the camera
         self.runtime_parameters = sl.RuntimeParameters()
 
-        # Set sensing mode if it is supported by the installed Zed SDK
-        try:
-            self.runtime_parameters.sensing_mode = sl.SENSING_MODE.FILL  # Use FILL sensing mode
-        except AttributeError:
-            pass
-
         # Setting the depth confidence parameters
         self.runtime_parameters.confidence_threshold = 60
 

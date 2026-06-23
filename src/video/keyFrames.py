@@ -1,11 +1,9 @@
 from src.gui.Core import basicWindowWidget, basicWorker
-
 from PyQt6.Qt3DExtras import Qt3DWindow, QOrbitCameraController, QSphereMesh, QPhongMaterial, QCylinderMesh
 from PyQt6.QtGui import QVector3D, QQuaternion
 from PyQt6.QtWidgets import QWidget, QFileDialog
 from PyQt6.Qt3DCore import QEntity, QTransform
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
-
 import numpy as np
 import scipy.io
 
@@ -364,7 +362,7 @@ class KeyFeed(basicWindowWidget):
         midpoint = QVector3D(
             (a.x() + b.x()) / 2.0,
             (a.y() + b.y()) / 2.0,
-            (a.z() + b.z()) / 2.0,
+            (a.z() + b.z()) / 2.0
         )
 
         # Rotate the cylinder to align with the direction

@@ -331,15 +331,15 @@ class SettingBox(QDialog):
                                         for participant in self.participants]
         settings["participantName"] = self.participantName.text()
 
-        testName = self.testName.text()
+        #testName = self.testName.text()
 
-        settings["testName"] = ""
-        for i, dict in enumerate(self.testsDicts):
-            if dict["name"] == testName:
-                settings["testName"] = self.testsDicts[i]
-                break
+        #settings["testName"] = ""
+        #for i, dict in enumerate(self.testsDicts):
+            #if dict["name"] == testName:
+                #settings["testName"] = self.testsDicts[i]
+                #break
 
-        settings["testNames"] = [dict for dict in self.testsDicts]
+        #settings["testNames"] = [dict for dict in self.testsDicts]
 
         mainSettings.clear()
         mainSettings.update(settings)

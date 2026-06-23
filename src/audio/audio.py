@@ -294,7 +294,7 @@ class AudioVisualizer(QWidget):
 
         # Fill the background
         rect = self.rect()
-        painter.fillRect(rect, QColor("#111111"))
+        painter.fillRect(rect, QColor("#222222"))
 
         # Calculate bar dimensions
         margin = 4
