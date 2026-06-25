@@ -1,8 +1,7 @@
 import cv2
 from PyQt6.QtCore import pyqtSignal, QThread, pyqtSlot, Qt
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import (QLabel, QVBoxLayout,
-                             QCheckBox, QSizePolicy, QHBoxLayout)
+from PyQt6.QtWidgets import (QLabel, QVBoxLayout, QCheckBox, QSizePolicy, QHBoxLayout)
 from src.tools.mediapipe.algorithms import mediaWork
 from src.tools.setting import GlobalSettings
 from src.video.Zed import Zed
@@ -39,6 +38,8 @@ class VideoWorker(basicWorker):
         self.videoFrame = None
         self.lastFrame = np.empty([])
         self.hasDepthCamera = False
+        self.frameNumber = 0
+        self.lastRecordedFrame = -1
 
     # ------------------------------------------------------------------
     # Worker lifecycle
@@ -229,6 +230,7 @@ class VideoWorker(basicWorker):
 
         # Save the current frame for recording
         self.videoFrame = rgb
+        self.frameNumber += 1
 
         # Create the Qt image
         h, w, ch = rgb.shape
@@ -287,6 +289,7 @@ class VideoWorker(basicWorker):
         # Set recording defaults
         self.recordStarTime = time.perf_counter()
         self.recordedFrames = []
+        self.lastRecordedFrame = -1
 
         # Only used for ZED / depth camera recording
         self.recordedPointClouds = []
@@ -318,23 +321,27 @@ class VideoWorker(basicWorker):
         """
         Save the current video frame and point cloud if recording.
         """
-        # Get the recording time
+        if self.videoFrame is None:
+            return
+
+        # Do not record the same source frame twice
+        if self.frameNumber == self.lastRecordedFrame:
+            return
+
         t = time.perf_counter() - self.recordStarTime
 
-        # Save the first frame or a changed frame
-        if self.lastFrame.size == 0:
-            self.recordedFrames.append((t, self.videoFrame.copy()))
-        elif not np.array_equal(self.videoFrame, self.lastFrame):
-            self.recordedFrames.append((t, self.videoFrame.copy()))
+        self.recordedFrames.append(
+            (t, self.videoFrame.copy())
+        )
 
-        # Save the last recorded frame for comparison
-        self.lastFrame = self.videoFrame.copy()
+        self.lastRecordedFrame = self.frameNumber
 
-        # Save point cloud data if depth camera is used
         if self.useDepthCamera and self.Zed is not None:
             if self.Zed.point_cloud_img is not None:
                 self.recordedPointClouds.append(
-                    self.Zed.point_cloud_img[..., :3].astype(np.float16).copy()
+                    self.Zed.point_cloud_img[..., :3]
+                    .astype(np.float16)
+                    .copy()
                 )
 
     def stopRecording(self):
@@ -345,13 +352,7 @@ class VideoWorker(basicWorker):
         if not self.recordedFrames:
             return
 
-        # Calculate the real recording FPS
-        duration = self.recordedFrames[-1][0] - self.recordedFrames[0][0]
-        frame_count = len(self.recordedFrames)
-        real_fps = frame_count / duration if duration > 0 else self.src_fps
-
-        # Clamp to the original source FPS so the file plays back at the right speed
-        real_fps = real_fps
+        real_fps = self.src_fps
 
         # Create the video writer
         height, width = self.recordedFrames[0][1].shape[:2]

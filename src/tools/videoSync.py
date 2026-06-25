@@ -119,16 +119,16 @@ class VideoSync(QDialog):
         actionLayout = QVBoxLayout()
 
         #Create action buttons
-        loadVideoBtn  = QPushButton("Load video")
-        addNoteBtn    = QPushButton("Add landmark")
+        loadVideoBtn = QPushButton("Load video")
+        addNoteBtn = QPushButton("Add landmark")
         clearNotesBtn = QPushButton("Clear landmarks")
-        calcBtn       = QPushButton("Calculate")
-        saveBtn       = QPushButton("Save")
-        closeBtn      = QPushButton("Close")
+        calcBtn = QPushButton("Calculate")
+        saveBtn = QPushButton("Save")
+        closeBtn = QPushButton("Close")
 
         #Create status labels
-        self.delayLabel     = QLabel("Delay: —")
-        self.landmarkLabel  = QLabel("Landmarks: 0")
+        self.delayLabel = QLabel("Delay: —")
+        self.landmarkLabel = QLabel("Landmarks: 0")
 
         #Connect action buttons
         loadVideoBtn.clicked.connect(self._loadVideo)
@@ -146,9 +146,9 @@ class VideoSync(QDialog):
         actionLayout.addStretch()
 
         #Add controls to the grid
-        controlsGrid.addWidget(self.videoLabel,  0, 0)
-        controlsGrid.addLayout(scrubLayout,      2, 0)
-        controlsGrid.addLayout(actionLayout,     0, 1, 3, 1)
+        controlsGrid.addWidget(self.videoLabel, 0, 0)
+        controlsGrid.addLayout(scrubLayout, 2, 0)
+        controlsGrid.addLayout(actionLayout, 0, 1, 3, 1)
 
         mainLayout.addLayout(controlsGrid)
         return mainLayout

@@ -425,8 +425,7 @@ class ScriptBox(QDialog):
         controlLayout.addWidget(self.scoreLabel, 2, 0, 1, 2)
         controlLayout.addWidget(self.table, 3, 0, 2, 2)
         controlLayout.addWidget(self.canvasContainer, 5, 0, 2, 2)
-        controlLayout.addWidget(self.figureCounter, 7,
-                                0, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        controlLayout.addWidget(self.figureCounter, 7, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
         controlLayout.addWidget(exportButton, 8, 0, 1, 2)
         controlLayout.addWidget(self.lastButton, 9, 0, 1, 1)
         controlLayout.addWidget(self.nextButton, 9, 1, 1, 1)

@@ -285,6 +285,7 @@ class basicWorker(QObject):
             finally:
                 recordThread = self.recordThread
                 if self.recordThread is not None and recordThread.isRunning():
+                    self.recordThread.quit()
                     self.recordThread.wait()
 
                 self.finished.emit()
@@ -355,25 +356,26 @@ class basicWorker(QObject):
             self.isRecording = False
 
     def _recordSetUp(self):
-        """
-        Manage recording in a separate recording thread.
-        """
-        # Start the recording thread
+        # Replace the queued signal callback with direct polling
+        if self.recordStopping and self.recordThread is not None and not self.recordThread.isRunning():
+            self.recorder = None
+            self.recordThread = None
+            self.isRecording = False
+            self.recordStopping = False
+
+        # Start a new recording
         if self.record and not self.isRecording:
             self.recorder = RecordingWorker(
                 self.initRecording,
                 self.recordloop,
                 self.stopRecording
             )
-
             self.recordThread = QThread()
             self.recorder.moveToThread(self.recordThread)
 
             self.recordThread.started.connect(self.recorder.run)
-
-            self.recorder.finished.connect(self.recordThread.quit)
+            self.recorder.finished.connect(self.recordThread.quit, Qt.ConnectionType.DirectConnection)
             self.recorder.finished.connect(self.recorder.deleteLater)
-            self.recorder.finished.connect(self._recordThreadFinished)
             self.recordThread.finished.connect(self.recordThread.deleteLater)
 
             self.stopRecord.connect(self.recorder.stop, Qt.ConnectionType.DirectConnection)
@@ -381,21 +383,11 @@ class basicWorker(QObject):
             self.recordThread.start()
             self.isRecording = True
 
-        # Stop the recording thread
+        # Stop the recording
         elif not self.record and self.isRecording and not self.recordStopping:
             self.recordStopping = True
-
             if self.recorder is not None:
                 self.stopRecord.emit()
-
-    def _recordThreadFinished(self):
-        """
-        Clean up the recording thread references.
-        """
-        self.recorder = None
-        self.recordThread = None
-        self.isRecording = False
-        self.recordStopping = False
 
     def setID(self, ID: int = 0):
         """

@@ -112,9 +112,13 @@ class mediaWork():
 
         # Use depth data if available
         if pcl is not None and cameraParameters is not None:
-            return self._findPositionDepth(img, pcl, cameraParameters)
+            points = self._findPositionDepth(img, pcl, cameraParameters)
         else:
-            return self._findPosition2D(img)
+            points = self._findPosition2D(img)
+
+        points = self.calculateValidPoints(points)
+
+        return points
 
     def _findHands(self, img, fps):
         """
@@ -306,27 +310,36 @@ class mediaWork():
 
         return annotated
 
-    def get_valid_pcl_point(self, pcl, ix, iy, radius=4):
+    def get_valid_pcl_point(self, pcl, ix, iy, radius=3, max_depth_difference=0.03):
         h, w = pcl.shape[:2]
+
+        center = np.asarray(pcl[iy, ix, :3], dtype=np.float32)
+        center_valid = np.all(np.isfinite(center))
+
         points = []
 
-        x0 = max(0, ix - radius)
-        x1 = min(w, ix + radius + 1)
-        y0 = max(0, iy - radius)
-        y1 = min(h, iy + radius + 1)
+        for y in range(max(0, iy - radius), min(h, iy + radius + 1)):
+            for x in range(max(0, ix - radius), min(w, ix + radius + 1)):
+                point = np.asarray(pcl[y, x, :3], dtype=np.float32)
 
-        for y in range(y0, y1):
-            for x in range(x0, x1):
-                p = pcl[y, x]
+                if not np.all(np.isfinite(point)):
+                    continue
 
-                tx = p[0]
-                ty = p[1]
-                tz = p[2]
+                if center_valid and abs(point[2] - center[2]) > max_depth_difference:
+                    continue
 
-                if np.isfinite(tx) and np.isfinite(ty) and np.isfinite(tz):
-                    points.append([tx, ty, tz])
+                points.append(point)
 
-        if len(points) == 0:
-            return None
+        if not points:
+            return center if center_valid else None
 
-        return np.median(np.array(points, dtype=np.float32), axis=0)
+        return np.median(np.asarray(points), axis=0)
+    
+
+    def calculateValidPoints(self, points) -> object:
+        leftpoints, rightpoints = points
+
+        leftpoints[0][2:]
+
+        #gives arrray with x, y, z
+        return points

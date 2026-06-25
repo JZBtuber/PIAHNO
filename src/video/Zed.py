@@ -250,8 +250,7 @@ class Zed():
 
             "depth": {
                 "minimum_distance": float(self.init_params.depth_minimum_distance),
-                "maximum_distance": float(self.init_params.depth_maximum_distance),
-                "confidence_threshold": int(self.runtime_parameters.confidence_threshold)
+                "maximum_distance": float(self.init_params.depth_maximum_distance)
             },
 
             "fps": float(self.fps)

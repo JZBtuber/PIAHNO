@@ -5,6 +5,7 @@ from PyQt6.QtCore import pyqtSignal, QThread
 from PyQt6.QtGui import QColor
 from src.gui.Core import *
 import time
+from collections import deque
 
 
 class MidiWorker(basicWorker):
@@ -40,7 +41,7 @@ class MidiWorker(basicWorker):
         """
         # Reset current messages and active notes
         self.msg = None
-        self.record_msg = None
+        self.record_queue = deque()
         self.active_notes.clear()
 
         # Open live MIDI input
@@ -85,7 +86,7 @@ class MidiWorker(basicWorker):
         # Process all pending MIDI messages
         for self.msg in self.inport.iter_pending():
             had_message = True
-            self.record_msg = self.msg
+            self.record_queue.append((self.msg, time.time()))
 
             # Handle note-on messages
             if self.msg.type == "note_on" and self.msg.velocity > 0:
@@ -170,6 +171,7 @@ class MidiWorker(basicWorker):
             'set_tempo', tempo=self.tempo, time=0))
 
         # Set starting recording time
+        self.record_queue = deque()
         self.last_record_time = time.time()
 
     def recordloop(self):
@@ -177,23 +179,17 @@ class MidiWorker(basicWorker):
         Save one live MIDI message if one is available.
         """
         # Record the last received MIDI message
-        if self.record_msg is not None:
-            now = time.time()
-            delta_seconds = now - self.last_record_time
-            self.last_record_time = now
+        while self.record_queue:
+            msg, timestamp = self.record_queue.popleft()
+            delta_seconds = timestamp - self.last_record_time
+            self.last_record_time = timestamp
 
-            # Convert elapsed seconds to MIDI ticks
-            delta_ticks = int(
-                mido.second2tick(
-                    delta_seconds,
-                    self.midi_recording.ticks_per_beat,
-                    self.tempo
-                )
-            )
-
-            # Add the message to the MIDI track
-            self.track.append(self.record_msg.copy(time=delta_ticks))
-            self.record_msg = None
+            delta_ticks = int(mido.second2tick(
+                delta_seconds,
+                self.midi_recording.ticks_per_beat,
+                self.tempo
+            ))
+            self.track.append(msg.copy(time=delta_ticks))
 
     def stopRecording(self):
         """
