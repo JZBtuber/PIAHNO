@@ -37,6 +37,7 @@ class KeyFrameWorker(QObject):
     """
     frameCount = pyqtSignal(int)
     frameDone = pyqtSignal()
+    error = pyqtSignal(str)
     finished = pyqtSignal()
     
 
@@ -69,13 +70,15 @@ class KeyFrameWorker(QObject):
 
         #Guard clause if the video cannot be opened
         if not capture.isOpened():
-            MessageBox("Error!", "Failed to open video file")
+            self.error.emit("Failed to open video file")
             self.finished.emit()
             return
         
         #Get video information
         frameNumber = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = capture.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            fps = 30.0
         
         #Send the frame count to the dialog
         self.frameCount.emit(frameNumber)
@@ -354,6 +357,7 @@ class KeyFrameExporter(QDialog):
         #Connecting signals
         self.worker.frameCount.connect(self.getLoadingLayout)
         self.worker.frameDone.connect(self.updateLoading)
+        self.worker.error.connect(self.showWorkerError)
         self.worker.finished.connect(self.thread.quit)
 
 
@@ -476,6 +480,11 @@ class KeyFrameExporter(QDialog):
         self.loadingBar.setValue(self.frameDone)
 
     
+    @pyqtSlot(str)
+    def showWorkerError(self, message: str):
+        MessageBox("Error!", message)
+
+
     def onThreadFinished(self):
         """
         Clear worker and thread references when export is finished.

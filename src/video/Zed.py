@@ -3,8 +3,9 @@ from src.tools.setting import GlobalSettings
 import json
 try:
     import pyzed.sl as sl
-except:
-    ""
+except Exception as exc:
+    sl = None
+    _pyzed_import_error = exc
 
 
 class Zed():
@@ -19,6 +20,9 @@ class Zed():
         :param filePath: Path to the input file if file mode is used.
         :param live: If `True`, the camera is opened as a live input.
         """
+        if sl is None:
+            raise RuntimeError(f"pyzed.sl is not available: {_pyzed_import_error}")
+
         # Create the Zed input type
         self.InputType = sl.InputType()
         self.fps = 30
@@ -64,15 +68,14 @@ class Zed():
         # Open the camera
         err = self.zed.open(self.init_params)
         if err != sl.ERROR_CODE.SUCCESS:
-            print(repr(err))
             self.zed.close()
-            exit(1)
+            raise RuntimeError(f"Failed to open ZED camera: {err!r}")
 
         # Create and set RuntimeParameters after opening the camera
         self.runtime_parameters = sl.RuntimeParameters()
 
         # Setting the depth confidence parameters
-        self.runtime_parameters.confidence_threshold = 60
+        self.runtime_parameters.confidence_threshold = int(GlobalSettings.get("zedConfidenceThreshold", 40))
 
         # Get Camera Calibration Parameters
         camera_info = self.zed.get_camera_information()

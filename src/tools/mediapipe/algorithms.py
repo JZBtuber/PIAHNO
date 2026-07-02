@@ -182,16 +182,10 @@ class mediaWork():
                         ix = int(px)
                         iy = int(py)
 
-                        # Get point from Zed point cloud object
-                        if hasattr(pcl, "get_value"):
-                            err, pointCloudValue = pcl.get_value(ix, iy)
-
-                            if err != 0:
-                                pointCloudValue = None
-
-                        # Get point from numpy point cloud array
-                        else:
-                            pointCloudValue = self.get_valid_pcl_point(pcl, ix, iy, radius=4)
+                        # Search near the landmark because hand/finger depth often has holes.
+                        pointCloudValue = self.get_valid_pcl_point(
+                            pcl, ix, iy, radius=6, max_depth_difference=0.08
+                        )
 
                         # Save the 3D coordinates if valid
                         if pointCloudValue is not None:
@@ -310,19 +304,29 @@ class mediaWork():
 
         return annotated
 
-    def get_valid_pcl_point(self, pcl, ix, iy, radius=3, max_depth_difference=0.03):
-        h, w = pcl.shape[:2]
+    def get_valid_pcl_point(self, pcl, ix, iy, radius=3, max_depth_difference=0.08):
+        if pcl is None:
+            return None
 
-        center = np.asarray(pcl[iy, ix, :3], dtype=np.float32)
-        center_valid = np.all(np.isfinite(center))
+        if hasattr(pcl, "get_width") and hasattr(pcl, "get_height"):
+            w = int(pcl.get_width())
+            h = int(pcl.get_height())
+        else:
+            h, w = pcl.shape[:2]
+
+        ix = int(np.clip(ix, 0, w - 1))
+        iy = int(np.clip(iy, 0, h - 1))
+
+        center = self._read_pcl_point(pcl, ix, iy)
+        center_valid = center is not None
 
         points = []
 
         for y in range(max(0, iy - radius), min(h, iy + radius + 1)):
             for x in range(max(0, ix - radius), min(w, ix + radius + 1)):
-                point = np.asarray(pcl[y, x, :3], dtype=np.float32)
+                point = self._read_pcl_point(pcl, x, y)
 
-                if not np.all(np.isfinite(point)):
+                if point is None:
                     continue
 
                 if center_valid and abs(point[2] - center[2]) > max_depth_difference:
@@ -334,6 +338,20 @@ class mediaWork():
             return center if center_valid else None
 
         return np.median(np.asarray(points), axis=0)
+
+    def _read_pcl_point(self, pcl, x, y):
+        if hasattr(pcl, "get_value"):
+            err, point = pcl.get_value(int(x), int(y))
+            if err != 0 or point is None:
+                return None
+            point = np.asarray(point[:3], dtype=np.float32)
+        else:
+            point = np.asarray(pcl[int(y), int(x), :3], dtype=np.float32)
+
+        if not np.all(np.isfinite(point)):
+            return None
+
+        return point
     
 
     def calculateValidPoints(self, points) -> object:

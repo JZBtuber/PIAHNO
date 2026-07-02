@@ -55,8 +55,15 @@ class VideoWorker(basicWorker):
 
         # Open a normal OpenCV capture if depth camera is not used
         if not self.useDepthCamera:
-            self.capture = cv2.VideoCapture(
-                path, (cv2.CAP_DSHOW if self.isLive else None))
+            if self.isLive:
+                self.capture = cv2.VideoCapture(path, cv2.CAP_DSHOW)
+            else:
+                self.capture = cv2.VideoCapture(path)
+
+            if not self.capture.isOpened():
+                self.running = False
+                self.pathError.emit()
+                return
 
             # Get the source FPS
             src_fps = self.capture.get(cv2.CAP_PROP_FPS)
@@ -82,8 +89,10 @@ class VideoWorker(basicWorker):
         else:
             try:
                 self.Zed = Zed(path, self.isLive)
-            except:
-                self.finished.emit()
+            except Exception as exc:
+                print(f"Failed to open ZED camera: {exc}")
+                self.running = False
+                self.pathError.emit()
                 return
 
             # Get the Zed source FPS
@@ -361,6 +370,10 @@ class VideoWorker(basicWorker):
         output = cv2.VideoWriter(self.newPath, fourcc,
                                  real_fps, (width, height))
 
+        if not output.isOpened():
+            print(f"Failed to open video writer: {self.newPath}")
+            return
+
         # Write the recorded frames
         for _, frame in self.recordedFrames:
             output.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
@@ -368,7 +381,7 @@ class VideoWorker(basicWorker):
         output.release()
 
         # Save depth camera data if available
-        if self.useDepthCamera and self.recordedPointClouds:
+        if self.useDepthCamera and self.recordedPointClouds and self.Zed is not None:
 
             self.Zed.saveCameraParameters(self.newCameraParametersPath)
 

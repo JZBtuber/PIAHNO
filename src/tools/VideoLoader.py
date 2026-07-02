@@ -12,6 +12,7 @@ class VideoWorker(QObject):
     """
     frameCount = pyqtSignal(int)
     frameDone = pyqtSignal()
+    error = pyqtSignal(str)
     finished = pyqtSignal()
 
     def __init__(self):
@@ -35,7 +36,7 @@ class VideoWorker(QObject):
 
         #Guard clause if the video cannot be opened
         if not capture.isOpened():
-            MessageBox("Error!", "Failed to open video file")
+            self.error.emit("Failed to open video file")
             self.finished.emit()
             return
 
@@ -57,6 +58,11 @@ class VideoWorker(QObject):
 
         #Create the output video writer
         output = cv2.VideoWriter(newPath, fourcc, fps, (width, height))
+        if not output.isOpened():
+            capture.release()
+            self.error.emit("Failed to create output video file")
+            self.finished.emit()
+            return
         
         #Create the Mediapipe algorithm object
         algorithm = mediaWork()
@@ -85,7 +91,7 @@ class VideoWorker(QObject):
         
         #Show error if not every frame was processed
         if not self.frameCountDone == self.frameNumber:
-            MessageBox("Error!", "The video loading didn't go correctly!")
+            self.error.emit("The video loading did not finish correctly")
 
         #Signal that the worker is finished
         self.finished.emit()
@@ -153,6 +159,7 @@ class VideoLoader(QDialog):
         #Connecting signals
         self.worker.frameCount.connect(self.getLoadingLayout)
         self.worker.frameDone.connect(self.updateLoading)
+        self.worker.error.connect(self.showWorkerError)
         self.worker.finished.connect(self.thread.quit)
 
         #Sends the worker to the thread
@@ -286,6 +293,11 @@ class VideoLoader(QDialog):
         #Set the path if a file was chosen
         if path:
             self.pathInput.setText(path)
+
+
+    @pyqtSlot(str)
+    def showWorkerError(self, message: str):
+        MessageBox("Error!", message)
 
 
     def onThreadFinished(self):

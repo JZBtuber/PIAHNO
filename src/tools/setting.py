@@ -12,5 +12,6 @@ GlobalSettings = { #General settings of the app
     "zedDepthMax" : 1.0,
     "zedResolution" : "HD1080",
     "zedFps" : 30,
-    "zedMode" : "Neural_Light"
+    "zedMode" : "Neural_Light",
+    "zedConfidenceThreshold" : 40
     }

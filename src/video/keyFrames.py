@@ -274,16 +274,22 @@ class KeyFeed(basicWindowWidget):
             # Set bone color by connection group
             if _c == 1:
                 material.setDiffuse(Qt.GlobalColor.cyan)
+                material.setAmbient(Qt.GlobalColor.cyan)
             elif _c == 2:
                 material.setDiffuse(Qt.GlobalColor.magenta)
+                material.setAmbient(Qt.GlobalColor.magenta)
             elif _c == 3:
                 material.setDiffuse(Qt.GlobalColor.blue)
+                material.setAmbient(Qt.GlobalColor.blue)
             elif _c == 4:
                 material.setDiffuse(Qt.GlobalColor.green)
+                material.setAmbient(Qt.GlobalColor.green)
             elif _c == 5:
                 material.setDiffuse(Qt.GlobalColor.red)
+                material.setAmbient(Qt.GlobalColor.red)
             elif _c == 6:
                 material.setDiffuse(Qt.GlobalColor.gray)
+                material.setAmbient(Qt.GlobalColor.gray)
 
             # Hide the bone until data is received
             transform = QTransform()
