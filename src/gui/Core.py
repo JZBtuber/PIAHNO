@@ -480,11 +480,13 @@ class basicWorker(QObject):
             " ", "_").replace(":", "-")[0:19]
 
         # Get the base saving path
-        pathToFile = GlobalSettings["pathToWorkingDir"] if GlobalSettings["pathToWorkingDir"] else os.path.join(
-            os.getcwd(), "Tests")
-        filepath = f"{GlobalSettings["participantName"]}\\{timeString}_Test" if GlobalSettings["participantName"] else f"{timeString}_Test"
+        workingDir = GlobalSettings["pathToWorkingDir"] if GlobalSettings["pathToWorkingDir"] else os.path.join(os.getcwd(), "Tests")
+        patient = GlobalSettings["participantName"] if GlobalSettings["participantName"] else "Untitled_patient"
+        session = timeString[:10]
+        test = GlobalSettings["testName"] if GlobalSettings["testName"] else "Untitled_test"
+        time = timeString[11:19]
 
-        return os.path.join(pathToFile, filepath)
+        return os.path.join(workingDir, patient, session, test, time)
 
 
 class basicWindowWidget(QWidget):

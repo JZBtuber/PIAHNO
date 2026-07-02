@@ -1,6 +1,6 @@
 GlobalSettings = { #General settings of the app
     "participantName" : "",
-    "testName" : {},
+    "testName" : "",
     "participantNames" : [],
     "testNames" : [],
     "pathToWorkingDir" : "",

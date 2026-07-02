@@ -4,7 +4,7 @@ import copy
 from os import path
 from src.tools.fileIO import saveSettings
 from src.gui.Core import QFileDialog
-from src.tools.Dialogs import ConfirmRemoveDialog, GetTestInformationDialog
+from src.tools.Dialogs import ConfirmRemoveDialog
 
 
 class SettingBox(QDialog):
@@ -22,6 +22,7 @@ class SettingBox(QDialog):
 
         # Flags
         self.addParticipantFlag = None
+        self.addTestFlag = None
 
         # Keep a temporary copy until the user saves
         settings = copy.deepcopy(mainSettings)
@@ -52,10 +53,10 @@ class SettingBox(QDialog):
                                           scroll), 1)
 
         # Test to use
-        #test = self._getCurrentTestWidget(settings)
-        #layout.addLayout(self._addSetting("Default test to use",
-        #                                  "Set the default test to use when using a script",
-        #                                  test), 1)
+        test = self._getCurrentTestWidget(settings)
+        layout.addLayout(self._addSetting("Default test to use",
+                                          "Set the default test to use when using a script",
+                                          test), 1)
 
         # Path to the recording directory
         self.dirInput = QLineEdit()
@@ -327,19 +328,11 @@ class SettingBox(QDialog):
         :param mainSettings: Main settings dictionary to update.
         """
         # Save the temporary settings into the main settings
-        settings["participantNames"] = [participant.text()
-                                        for participant in self.participants]
+        settings["participantNames"] = [participant.text() for participant in self.participants]
         settings["participantName"] = self.participantName.text()
 
-        #testName = self.testName.text()
-
-        #settings["testName"] = ""
-        #for i, dict in enumerate(self.testsDicts):
-            #if dict["name"] == testName:
-                #settings["testName"] = self.testsDicts[i]
-                #break
-
-        #settings["testNames"] = [dict for dict in self.testsDicts]
+        settings["testNames"] = [test.text() for test in self.tests]
+        settings["testName"] = self.testName.text()
 
         mainSettings.clear()
         mainSettings.update(settings)
@@ -602,8 +595,8 @@ class SettingBox(QDialog):
         removeButton.clicked.connect(self._removeTest)
 
         # Label for the selected test
-        if "name" in settings["testName"]:
-            self.testName = QLabel(settings["testName"]["name"])
+        if settings["testName"]:
+            self.testName = QLabel(settings["testName"])
         else:
             self.testName = QLabel("")
         self.testName.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -631,45 +624,62 @@ class SettingBox(QDialog):
         mainWidget.setLayout(testLayout)
         return mainWidget
 
-    def _addTest(self, layout: QVBoxLayout, dict_: dict = {}) -> None:
+    def _addTest(self, layout: QVBoxLayout, name: str = "") -> None:
         """
         Add a test to the list available.\n
         :param `QVBoxLayout` layout: Layout to add the created layout to.
         :param `dict` dict_: Ditionnary of the test to add directly.
         """
+        # Guard clause if the button is clicked twice
+        if self.addTestFlag:
+            layout.removeWidget(self.addTestFlag)
+            self.addTestFlag = None
+            return
+        
         # Set the settings for the layout.
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Guard clause for if the name is given. Directly add the label
-        if dict_:
-            self._addTestLabel(layout, dict_)
+        if name:
+            self._addTestLabel(layout, name)
             return
 
-        dict_ = {"name": "test1", "scriptPath": "",
-                 "filesToInclude": ["", "", ""]}
+        # Inputs for the test input.
+        addButton = QPushButton("Add")
+        inputLineEdit = QLineEdit()
+        addButton.clicked.connect(
+            lambda: self._addTestLabel(layout, inputLineEdit.text()))
+        
+        # layout for the inputs
+        addLayout = QHBoxLayout()
+        addLayout.addWidget(inputLineEdit, 0)
+        addLayout.addWidget(addButton, 0)
 
-        dialog = GetTestInformationDialog()
-        result = dialog.exec()
+        # Container widget for the layout
+        container = QWidget()
+        container.setLayout(addLayout)
 
-        if result:
-            self._addTest(layout, dialog.getDict())
-        else:
-            return
+        layout.insertWidget(0, container)
 
-    def _addTestLabel(self, layout: QVBoxLayout, dict_: dict = {}) -> None:
+        self.addTestFlag = container
+
+    def _addTestLabel(self, layout: QVBoxLayout, name: str) -> None:
         """
         Add a label to the `layout` parameter with the `dict_["name"]` text.\n
         :param `QVBoxLayout` layout: Layout to which the label will be added.
         :param `dict` dict_: Dictionnary with the test name to add to the list.
         """
         # If the name is empty, returns
-        if not dict_:
+        if self.addTestFlag:
+            layout.removeWidget(self.addTestFlag)
+            self.addTestFlag = None
+
+        # If the name is empty, returns
+        if not name:
             return
-        else:
-            self.testsDicts.append(dict_)
 
         # Create and set the label's settings
-        nameLabel = QLabel(dict_["name"])
+        nameLabel = QLabel(name)
         nameLabel.setObjectName("nameLabel")
         nameLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         nameLabel.setStyleSheet("""
@@ -686,7 +696,7 @@ class SettingBox(QDialog):
 
         # If the list is empty, set the name as chosen
         if not self.testName.text():
-            self.testName.setText(dict_["name"])
+            self.testName.setText(name)
 
     def _updateChosentest(self, label: QLabel) -> None:
         """
@@ -714,14 +724,9 @@ class SettingBox(QDialog):
                     label.setParent(None)
                     label.deleteLater()
                     self.tests.remove(label)
-                else:
+                elif dialog.rejected:
                     return
 
-                break
-
-        for test in self.testsDicts:
-            if test["name"] == currentTest:
-                self.testsDicts.remove(test)
                 break
 
         # Change the chosen name

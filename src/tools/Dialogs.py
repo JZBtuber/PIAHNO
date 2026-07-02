@@ -30,54 +30,6 @@ class ConfirmRemoveDialog(QDialog):
         self.setLayout(layout)
 
 
-class GetTestInformationDialog(QDialog):
-    """
-    Get information for a test.
-    """
-    def __init__(self) -> None:
-        super().__init__()
-        self.dict = {}
-        filesToLoad = []
-        
-        # Set window settings
-        self.setWindowTitle("Input script settings")
-
-        # Creating the buttons
-        QButton = (QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        self.buttonBox = QDialogButtonBox(QButton)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-
-        # Inputs
-        nameLabel = QLabel("Name of the test")
-
-        self.nameInput = QLineEdit()
-        self.nameInput.setPlaceholderText("Name of the test...")
-
-        scriptLayout = QHBoxLayout()
-
-        self.scriptInput = QLineEdit()
-        self.scriptInput.setPlaceholderText("ScriptFile...")
-        self.scriptInput.setMinimumSize(400, 30)
-
-        scriptBrowseButton = QPushButton("Browse scripts")
-        scriptBrowseButton.clicked.connect(self.browseScripts)
-
-        scriptLayout.addWidget(self.scriptInput)
-        scriptLayout.addWidget(scriptBrowseButton)
-
-        # Layout
-        layout = QVBoxLayout()
-        layout.addWidget(nameLabel)
-        layout.addWidget(self.nameInput)
-        layout.addLayout(scriptLayout)
-
-        layout.addWidget(self.buttonBox)
-        
-
-        self.setLayout(layout)
-
-
     def getDict(self) -> dict:
         if not self.nameLabel.text():
             return
@@ -87,7 +39,6 @@ class GetTestInformationDialog(QDialog):
 
         return self.dict
     
-
 
     def browseScripts(self):
         """
