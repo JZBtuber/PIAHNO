@@ -231,17 +231,17 @@ class KeyFeed(basicWindowWidget):
 
             # Set point color by finger section
             if 1 < i < 5:
-                material.setDiffuse(Qt.GlobalColor.cyan)
+                self.set_uniform_color(material, Qt.GlobalColor.cyan)
             elif 5 < i < 9:
-                material.setDiffuse(Qt.GlobalColor.magenta)
+                self.set_uniform_color(material, Qt.GlobalColor.magenta)
             elif 9 < i < 13:
-                material.setDiffuse(Qt.GlobalColor.blue)
+                self.set_uniform_color(material, Qt.GlobalColor.blue)
             elif 13 < i < 17:
-                material.setDiffuse(Qt.GlobalColor.green)
+                self.set_uniform_color(material, Qt.GlobalColor.green)
             elif 17 < i < 21:
-                material.setDiffuse(Qt.GlobalColor.red)
-            elif i == 0 or i == 1 or i == 5 or i == 8 or i == 12 or i == 16:
-                material.setDiffuse(Qt.GlobalColor.gray)
+                self.set_uniform_color(material, Qt.GlobalColor.red)
+            elif i == 0 or i == 1 or i == 5 or i == 9 or i == 13 or i == 17:
+                self.set_uniform_color(material, Qt.GlobalColor.gray)
 
             # Create the sphere mesh
             mesh = QSphereMesh()
@@ -273,23 +273,18 @@ class KeyFeed(basicWindowWidget):
 
             # Set bone color by connection group
             if _c == 1:
-                material.setDiffuse(Qt.GlobalColor.cyan)
-                material.setAmbient(Qt.GlobalColor.cyan)
+                self.set_uniform_color(material, Qt.GlobalColor.cyan)
             elif _c == 2:
-                material.setDiffuse(Qt.GlobalColor.magenta)
-                material.setAmbient(Qt.GlobalColor.magenta)
+                self.set_uniform_color(material, Qt.GlobalColor.magenta)
             elif _c == 3:
-                material.setDiffuse(Qt.GlobalColor.blue)
-                material.setAmbient(Qt.GlobalColor.blue)
+                self.set_uniform_color(material, Qt.GlobalColor.blue)
             elif _c == 4:
-                material.setDiffuse(Qt.GlobalColor.green)
-                material.setAmbient(Qt.GlobalColor.green)
+                self.set_uniform_color(material, Qt.GlobalColor.green)
             elif _c == 5:
-                material.setDiffuse(Qt.GlobalColor.red)
-                material.setAmbient(Qt.GlobalColor.red)
+                self.set_uniform_color(material, Qt.GlobalColor.red)
             elif _c == 6:
-                material.setDiffuse(Qt.GlobalColor.gray)
-                material.setAmbient(Qt.GlobalColor.gray)
+                self.set_uniform_color(material, Qt.GlobalColor.gray)
+
 
             # Hide the bone until data is received
             transform = QTransform()
@@ -396,3 +391,9 @@ class KeyFeed(basicWindowWidget):
         # Set the path if a file was chosen
         if path:
             self.pathInput.setText(path)
+
+    def set_uniform_color(self, material: QPhongMaterial, color):
+        material.setAmbient(color)
+        material.setDiffuse(Qt.GlobalColor.black)
+        material.setSpecular(Qt.GlobalColor.black)
+        material.setShininess(0.0)

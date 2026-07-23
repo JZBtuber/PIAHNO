@@ -62,8 +62,8 @@ class Zed():
         self.init_params.camera_fps = GlobalSettings["zedFps"]
         self.init_params.depth_mode = mode
         self.init_params.coordinate_units = sl.UNIT.METER
-        self.init_params.depth_minimum_distance = GlobalSettings["zedDepthMin"]
-        self.init_params.depth_maximum_distance = GlobalSettings["zedDepthMax"]
+        self.init_params.depth_minimum_distance = GlobalSettings["depthMin"]
+        self.init_params.depth_maximum_distance = GlobalSettings["depthMax"]
 
         # Open the camera
         err = self.zed.open(self.init_params)
@@ -216,7 +216,7 @@ class Zed():
 
         # Return the point if it is valid
         if err == sl.ERROR_CODE.SUCCESS:
-            x3d, y3d, z3d, rgba = point
+            x3d, y3d, z3d, _ = point
 
             if np.isfinite(x3d) and np.isfinite(y3d) and np.isfinite(z3d):
                 return float(x3d), float(y3d), float(z3d)

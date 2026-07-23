@@ -127,8 +127,19 @@ class SettingBox(QDialog):
                                           "Set the presence confidence score requiered for the palm detection model to find the hand if it is partialy covered or on the edge of the screen",
                                           presenceConfidence), 0)
 
-        # Depth camera options
-        self.checkZed(settings, layout)
+        # Depth combo box
+        providers = self._checkDepthProviders()
+        self.zedLayout = None
+        self.depthComboBox = QComboBox()
+        self.depthComboBox.addItems(providers)
+        self.depthComboBox.addItem("None", None)
+        self.depthComboBox.currentIndexChanged.connect(lambda: self._changeDepthProvider(layout, settings))
+        self.depthComboBox.setCurrentText(settings["depthCameraProvider"] if settings["depthCameraProvider"] is not "" else "None")
+
+        layout.addLayout(self._addSetting("Depth provider",
+                                          "Chose from the available depth provider (zed or realsens)",
+                                          self.depthComboBox), 0)
+        self._changeDepthProvider(layout, settings)
 
         # Add participants to the scroll bar
         for participant in settings["participantNames"]:
@@ -198,54 +209,41 @@ class SettingBox(QDialog):
     # Depth camera settings
     # ---------------------------------------------------
 
-    def checkZed(self, settings, layout) -> None:
+    def checkZed(self, settings) -> QVBoxLayout:
         """
         Options for the Zed depth camera.\n
         :param settings: Settings dictionary to update.
-        :param layout: Layout where the Zed settings will be added.
+        :returns: Returns the layout for those settings.
+        :rtype: `QVBoxLayout`
         """
-        # Check if the depth camera module is available
-        settings["depthCameraAvailable"] = self._checkPyzed()
 
-        # Guard clause if the depth camera module is not available
-        if not settings["depthCameraAvailable"]:
-            return
-
-        # Enabling the depth camera
-        zedCheckBox = QCheckBox("Make the depth camera available")
-        zedCheckBox.setChecked(settings["depthCameraAvailable"])
-        zedCheckBox.stateChanged.connect(
-            lambda checked: settings.__setitem__("depthCameraAvailable", bool(checked)))
-
-        layout.addLayout(self._addSetting("Use depth cameras",
-                                          "Make the use of Zed depth camera available when recording",
-                                          zedCheckBox), 1)
+        zedLayout = QVBoxLayout()
  
         # Minimum depth
         zedMinDepth = QDoubleSpinBox()
-        zedMinDepth.setValue(settings["zedDepthMin"])
+        zedMinDepth.setValue(settings["depthMin"])
         zedMinDepth.setMaximum(1.0)
         zedMinDepth.setMinimum(0.2)
         zedMinDepth.setDecimals(2)
         zedMinDepth.setSingleStep(0.01)
         zedMinDepth.valueChanged.connect(
-            lambda value: settings.__setitem__("zedDepthMin", value))
+            lambda value: settings.__setitem__("depthMin", value))
 
-        layout.addLayout(self._addSetting("Minimum depth",
+        zedLayout.addLayout(self._addSetting("Minimum depth",
                                           "Set the minimum depth for the Zed depth camera",
                                           zedMinDepth), 0)
 
         # Maximum depth
         zedMaxDepth = QDoubleSpinBox()
-        zedMaxDepth.setValue(settings["zedDepthMax"])
+        zedMaxDepth.setValue(settings["depthMax"])
         zedMaxDepth.setMaximum(10.0)
         zedMaxDepth.setMinimum(1.0)
         zedMaxDepth.setDecimals(2)
         zedMaxDepth.setSingleStep(0.01)
         zedMaxDepth.valueChanged.connect(
-            lambda value: settings.__setitem__("zedDepthMax", value))
+            lambda value: settings.__setitem__("depthMax", value))
 
-        layout.addLayout(self._addSetting("Maximum depth",
+        zedLayout.addLayout(self._addSetting("Maximum depth",
                                           "Set the maximum depth for the Zed depth camera",
                                           zedMaxDepth), 0)
 
@@ -257,7 +255,7 @@ class SettingBox(QDialog):
         zedResolution.currentTextChanged.connect(
             lambda: self._updateComboBox(zedResolution.currentText(), settings))
 
-        layout.addLayout(self._addSetting("Resolution",
+        zedLayout.addLayout(self._addSetting("Resolution",
                                           "Set the resolution for the zed depth camera",
                                           zedResolution), 0)
 
@@ -268,7 +266,7 @@ class SettingBox(QDialog):
         self.zedFps.currentTextChanged.connect(lambda: settings.__setitem__("zedFps", int(
             self.zedFps.currentText().removesuffix("FPS"))) if self.zedFps.currentText() else 0)
 
-        layout.addLayout(self._addSetting("Frame rate",
+        zedLayout.addLayout(self._addSetting("Frame rate",
                                           "Set the maximum frame rate for the zed depth camera",
                                           self.zedFps), 0)
 
@@ -280,9 +278,11 @@ class SettingBox(QDialog):
         zedMode.setCurrentText(
             settings["zedMode"] if settings["zedMode"] is not None else "Neural_Light")
 
-        layout.addLayout(self._addSetting("Mode",
+        zedLayout.addLayout(self._addSetting("Mode",
                                           "Set the mode for the depth camera neural network",
                                           zedMode), 0)
+        
+        return zedLayout
 
     def _updateComboBox(self, value: str, settings) -> None:
         """
@@ -358,20 +358,6 @@ class SettingBox(QDialog):
         # Update the directory input if a directory was chosen
         if dirName:
             self.dirInput.setText(str(path.abspath(dirName)))
-
-    @staticmethod
-    def _checkPyzed() -> bool:
-        """
-        Check if the pyzed module is installed.\n
-        :returns: Returns `True` if pyzed can be imported, otherwise returns `False`.
-        :rtype: `bool`
-        """
-        # Try to import the Zed module
-        try:
-            import pyzed.sl
-        except ImportError:
-            return False
-        return True
 
     # -------------------------------------------------
     # Participant scroll area
@@ -734,3 +720,43 @@ class SettingBox(QDialog):
             self.testName.setText(self.tests[0].text())
         else:
             self.testName.setText("")
+
+    def _checkDepthProviders(self) -> list[str]:
+        """
+        Get a list of available depth camera sdk on the system.\n
+        Returns the list of options by name.\n
+        :returns: A list of available depth camera sdk.
+        :rtype: `list[str]`
+        """
+
+        depthProviders = []
+
+        try:
+            import pyzed.sl
+            depthProviders.append("Zed")
+        except ImportError as e:
+            print("Could not import pyzed: " + e )
+
+        try:
+            import pyrealsense2
+            depthProviders.append("Realsens")
+        except ImportError as e:
+            print("Could not import Realsens: " + e)
+        return depthProviders
+    
+    def _changeDepthProvider(self, layout: QVBoxLayout, settings):
+        if self.zedLayout:
+            layout.removeItem(self.zedLayout)
+            self.zedLayout = None
+
+        if self.depthComboBox.currentText() == "Zed":
+            settings["depthCameraProvider"] = "Zed"
+            self.zedLayout = self.checkZed(settings)
+            layout.addLayout((self.zedLayout))
+            settings["depthCameraAvailable"] = True
+        elif self.depthComboBox.currentText() == "Realsens":
+            settings["depthCameraProvider"] = "Realsens"
+            settings["depthCameraAvailable"] = True
+        else:
+            settings["depthCameraProvider"] = ""
+            settings["depthCameraAvailable"] = False

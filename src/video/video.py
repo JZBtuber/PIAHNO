@@ -5,18 +5,18 @@ from PyQt6.QtWidgets import (QLabel, QVBoxLayout, QCheckBox, QSizePolicy, QHBoxL
 from src.tools.mediapipe.algorithms import mediaWork
 from src.tools.setting import GlobalSettings
 from src.video.Zed import Zed
+from src.video.RealSens import RealSens
 import numpy as np
 import time
 import os
 from src.gui.Core import *
-
-
+import ctypes
 
 class VideoWorker(basicWorker):
     """
     Worker used to read video frames from file, live camera, or Zed depth camera.
     """
-    frameReady = pyqtSignal(QImage)
+    frameReady = pyqtSignal(object)
     fpsReady = pyqtSignal(float)
 
     def __init__(self, path, isLive):
@@ -34,7 +34,7 @@ class VideoWorker(basicWorker):
         self.target_dt = 1.0 / 60.0
         self.algorithm = mediaWork()
         self.useDepthCamera = False
-        self.Zed = None
+        self.depth = None
         self.videoFrame = None
         self.lastFrame = np.empty([])
         self.hasDepthCamera = False
@@ -49,12 +49,15 @@ class VideoWorker(basicWorker):
         """
         Prepare the video source before the main worker loop starts.
         """
+
+        self._set_high_res_timer()
+
         # Get the input path and save the current depth mode
         path = self.path
         self._depthMode = self.useDepthCamera
 
         # Open a normal OpenCV capture if depth camera is not used
-        if not self.useDepthCamera:
+        if not self.useDepthCamera or GlobalSettings["depthCameraProvider"] is None:
             if self.isLive:
                 self.capture = cv2.VideoCapture(path, cv2.CAP_DSHOW)
             else:
@@ -88,29 +91,26 @@ class VideoWorker(basicWorker):
         # Open a Zed camera if depth camera is used
         else:
             try:
-                self.Zed = Zed(path, self.isLive)
+                if GlobalSettings["depthCameraProvider"] == "Zed":
+                    self.depth = Zed(path, self.isLive)
+                else:
+                    self.depth = RealSens(path, self.isLive)
+
             except Exception as exc:
-                print(f"Failed to open ZED camera: {exc}")
+                print(f"Failed to open depth camera: {exc}")
                 self.running = False
                 self.pathError.emit()
                 return
 
             # Get the Zed source FPS
-            src_fps = self.Zed.getFps()
+            src_fps = self.depth.getFps()
             self.src_fps = src_fps if src_fps > 0 else 30
             self.target_dt = 1.0 / self.src_fps
 
+            print(f"src_fps={self.src_fps} target_dt={self.target_dt*1000:.2f}ms")
+
             self.prevTime = time.perf_counter()
             self.smoothedFps = 0.0
-
-            # Create file frame events for synchronized playback
-            if not self.isLive:
-                total_frames = int(self.Zed.getFrameCount())
-                self.events = [
-                    (int(i * 1000.0 / self.src_fps), i)
-                    for i in range(total_frames)
-                ]
-                self.event_index = 0
 
     def loop(self):
         """
@@ -126,10 +126,11 @@ class VideoWorker(basicWorker):
         """
         Release the video source after the worker loop stops.
         """
+        self._set_high_res_timer(True)
         # Close the depth camera if it was used
         if self.useDepthCamera:
-            if self.Zed is not None:
-                self.Zed.close()
+            if self.depth is not None:
+                self.depth.close()
 
         # Release the OpenCV capture if it was used
         else:
@@ -145,7 +146,7 @@ class VideoWorker(basicWorker):
 
         # Read frame from Zed or OpenCV
         if self._depthMode:
-            ret, frame = self.Zed.read()
+            ret, frame = self.depth.read()
         else:
             ret, frame = self.capture.read()
 
@@ -208,84 +209,48 @@ class VideoWorker(basicWorker):
             return
 
         # ZED returns BGRA, OpenCV returns BGR.
-        if self._depthMode:
-            if frame.shape[2] == 4:
-                bgr_frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-            else:
-                bgr_frame = frame
-        else:
-            bgr_frame = frame
+        if frame.shape[2] == 4:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
 
         # Apply hand algorithm if enabled
         if self.useAlgorithm:
-            if not self.useDepthCamera:
-                rgb = self.algorithm.draw2dHands(
-                    bgr_frame,
-                    self.src_fps,
-                    self.useOnlyAlgorithm
-                )
-            else:
-                rgb = self.algorithm.draw3dHands(
-                    bgr_frame,
-                    self.src_fps,
-                    self.Zed.point_cloud,
-                    self.Zed.camera_params,
-                    self.useOnlyAlgorithm
-                )
-
+            frame = self.algorithm.draw2dHands(
+                frame,
+                self.src_fps,
+                self.useOnlyAlgorithm
+            )
         # Convert normal OpenCV frame to RGB
         else:
-            rgb = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Save the current frame for recording
-        self.videoFrame = rgb
+        self.videoFrame = frame
         self.frameNumber += 1
 
-        # Create the Qt image
-        h, w, ch = rgb.shape
-        qimg = QImage(
-            rgb.data,
-            w,
-            h,
-            ch * w,
-            QImage.Format.Format_RGB888
-        ).copy()
-
         # Send the frame to the GUI
-        self.frameReady.emit(qimg)
+        self.frameReady.emit(frame)
 
     def _pace(self, loop_start: float):
-        """
-        Busy-wait until at least one frame-period has elapsed (live only).\n
-        :param `float` loop_start: Time when the current loop started.
-        """
-        # Calculate target time for the next frame
         target = loop_start + self.target_dt
         remaining = target - time.perf_counter()
-
-        # Sleep most of the remaining time
-        if remaining > 0.0005:                          # sleep off the bulk
-            QThread.usleep(int((remaining - 0.0005) * 1_000_000))
-
-        # Spin for the last fraction of time
-        while time.perf_counter() < target:             # tiny spin: < 0.5ms, negligible GIL pressure
+        # Sleep only for the safely-coarse portion, leave more margin for OS tick rounding
+        if remaining > 0.003:
+            QThread.usleep(int((remaining - 0.002) * 1_000_000))
+        while time.perf_counter() < target:
             pass
 
     def _update_fps(self):
         """
-        Update and emit the smoothed FPS value.
+        Emit the FPS calculated from the time between the last two frames.
         """
-        # Calculate time between frames
         now = time.perf_counter()
-        dt = now - self.prevTime
+        frame_time = now - self.prevTime
         self.prevTime = now
 
-        # Calculate and emit smoothed FPS
-        if dt > 0:
-            inst = 1.0 / dt
-            self.smoothedFps = (self.smoothedFps * 0.9 + inst * 0.1
-                                if self.smoothedFps else inst)
-            self.fpsReady.emit(self.smoothedFps)
+        if frame_time > 0:
+            last_frame_fps = 1.0 / frame_time
+            self.fpsReady.emit(last_frame_fps)
 
     # ------------------------------------------------------------------
     # Recording
@@ -345,10 +310,10 @@ class VideoWorker(basicWorker):
 
         self.lastRecordedFrame = self.frameNumber
 
-        if self.useDepthCamera and self.Zed is not None:
-            if self.Zed.point_cloud_img is not None:
+        if self.useDepthCamera and self.depth is not None:
+            if self.depth.point_cloud_img is not None:
                 self.recordedPointClouds.append(
-                    self.Zed.point_cloud_img[..., :3]
+                    self.depth.point_cloud_img[..., :3]
                     .astype(np.float16)
                     .copy()
                 )
@@ -381,9 +346,9 @@ class VideoWorker(basicWorker):
         output.release()
 
         # Save depth camera data if available
-        if self.useDepthCamera and self.recordedPointClouds and self.Zed is not None:
+        if self.useDepthCamera and self.recordedPointClouds and self.depth is not None:
 
-            self.Zed.saveCameraParameters(self.newCameraParametersPath)
+            self.depth.saveCameraParameters(self.newCameraParametersPath)
 
             np.savez(
                 self.newHandPointCloudPath,
@@ -417,6 +382,21 @@ class VideoWorker(basicWorker):
         :param `bool` value: New depth camera state.
         """
         self.useDepthCamera = value
+
+    def _set_high_res_timer(self, release: bool = False):
+        if not release:
+            try:
+                winmm = ctypes.WinDLL('winmm')
+                winmm.timeBeginPeriod(1)
+            except Exception:
+                pass  # not on Windows, or unavailable
+        else:
+            try:
+                winmm = ctypes.WinDLL('winmm')
+                winmm.timeEndPeriod(1)
+            except Exception:
+                pass  # not on Windows, or unavailable
+
 
 
 # ======================================================================
@@ -490,14 +470,24 @@ class VideoFeed(basicWindowWidget):
         self.worker.frameReady.connect(self.setImage)
         self.worker.fpsReady.connect(self.updateFpsLabel)
 
-    @pyqtSlot(QImage)
+    @pyqtSlot(object)
     def setImage(self, image):
         """
-        Set the displayed image from a QImage.\n
+        Set the displayed image from an image.\n
         :param image: Image to display.
         """
+            # Create the Qt image
+        h, w, ch = image.shape
+        qimg = QImage(
+            image.data,
+            w,
+            h,
+            ch * w,
+            QImage.Format.Format_RGB888
+        ).copy()
+
         # Create pixmap from image
-        pixmap = QPixmap.fromImage(image)
+        pixmap = QPixmap.fromImage(qimg)
 
         # Scale the image to the display widget
         scaled = pixmap.scaled(self.mainWidget.size(),
