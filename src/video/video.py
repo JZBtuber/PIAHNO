@@ -1,65 +1,138 @@
 import cv2
 from PyQt6.QtCore import pyqtSignal, QThread, pyqtSlot, Qt
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import (QLabel, QVBoxLayout, QCheckBox, QSizePolicy, QHBoxLayout)
+from PyQt6.QtWidgets import (
+    QLabel,
+    QVBoxLayout,
+    QCheckBox,
+    QSizePolicy,
+    QHBoxLayout
+)
+
 from src.tools.mediapipe.algorithms import mediaWork
 from src.tools.setting import GlobalSettings
 from src.video.Zed import Zed
 from src.video.RealSens import RealSens
+from src.gui.Core import *
+
 import numpy as np
 import time
 import os
-from src.gui.Core import *
 import ctypes
+import csv
+import threading
+import serial
+
+from bisect import bisect_left
+import queue
+
 
 class VideoWorker(basicWorker):
     """
-    Worker used to read video frames from file, live camera, or Zed depth camera.
+    Worker used to read video frames from a file, live camera,
+    ZED camera, or RealSense camera.
     """
+
     frameReady = pyqtSignal(object)
     fpsReady = pyqtSignal(float)
 
     def __init__(self, path, isLive):
         """
-        Create the video worker.\n
-        :param path: Path to the video file or live device identifier.
-        :param isLive: If `True`, the worker uses a live camera input.
+        Create the video worker.
+
+        :param path: Video path or live camera identifier.
+        :param isLive: True when using a live camera.
         """
         super().__init__(path, isLive)
 
-        # Set default variables
+        # --------------------------------------------------------------
+        # Video state
+        # --------------------------------------------------------------
+
         self.cameraNumber = 0
+
         self.useAlgorithm = False
         self.useOnlyAlgorithm = False
-        self.target_dt = 1.0 / 60.0
-        self.algorithm = mediaWork()
+
         self.useDepthCamera = False
+        self._depthMode = False
+
         self.depth = None
+        self.capture = None
+
+        self.src_fps = 30.0
+        self.target_dt = 1.0 / self.src_fps
+
+        self.algorithm = mediaWork()
+
         self.videoFrame = None
         self.lastFrame = np.empty([])
-        self.hasDepthCamera = False
+
         self.frameNumber = 0
         self.lastRecordedFrame = -1
 
-    # ------------------------------------------------------------------
+        self.prevTime = time.perf_counter()
+        self.smoothedFps = 0.0
+
+        self.events = []
+        self.event_index = 0
+
+        # --------------------------------------------------------------
+        # Recording state
+        # --------------------------------------------------------------
+
+        self.filepath = ""
+        self.recordStartTime = 0.0
+
+        self.recordedFrames = []
+        self.recordedFrameTimes = []
+        self.recordedPointClouds = []
+
+        # --------------------------------------------------------------
+        # TTL state
+        # --------------------------------------------------------------
+
+        self.ttl = []
+
+        # Thread-safe queue used to move serial events from the TTL
+        # thread to the video worker thread.
+        self.ttlQueue = queue.SimpleQueue()
+
+        # Allows the TTL thread to be stopped cleanly.
+        self.ttlStopEvent = threading.Event()
+
+        self.ttlThread = None
+        self.ttlSerial = None
+
+    # ==================================================================
     # Worker lifecycle
-    # ------------------------------------------------------------------
+    # ==================================================================
 
     def beforeLoop(self):
         """
-        Prepare the video source before the main worker loop starts.
+        Prepare the video source before the main loop starts.
         """
-
         self._set_high_res_timer()
 
-        # Get the input path and save the current depth mode
         path = self.path
-        self._depthMode = self.useDepthCamera
+        provider = GlobalSettings["depthCameraProvider"]
 
-        # Open a normal OpenCV capture if depth camera is not used
-        if not self.useDepthCamera or GlobalSettings["depthCameraProvider"] is None:
+        # Only enable depth mode when both the checkbox and a valid
+        # provider are configured.
+        self._depthMode = bool(
+            self.useDepthCamera and provider is not None
+        )
+
+        # --------------------------------------------------------------
+        # Open regular OpenCV source
+        # --------------------------------------------------------------
+
+        if not self._depthMode:
             if self.isLive:
-                self.capture = cv2.VideoCapture(path, cv2.CAP_DSHOW)
+                self.capture = cv2.VideoCapture(
+                    int(path),
+                    cv2.CAP_DSHOW
+                )
             else:
                 self.capture = cv2.VideoCapture(path)
 
@@ -68,33 +141,46 @@ class VideoWorker(basicWorker):
                 self.pathError.emit()
                 return
 
-            # Get the source FPS
             src_fps = self.capture.get(cv2.CAP_PROP_FPS)
-            self.src_fps = src_fps if src_fps > 0 else 30.0
-            self.fpsReady.emit(self.src_fps)
 
-            # Set frame timing
+            if src_fps is None or src_fps <= 0:
+                src_fps = 30.0
+
+            self.src_fps = float(src_fps)
             self.target_dt = 1.0 / self.src_fps
 
-            self.prevTime = time.perf_counter()
-            self.smoothedFps = 0.0
+            self.fpsReady.emit(self.src_fps)
 
-            # Create file frame events for synchronized playback
+            # Build the event list used for synchronized file playback.
             if not self.isLive:
-                total_frames = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
+                total_frames = int(
+                    self.capture.get(cv2.CAP_PROP_FRAME_COUNT)
+                )
+
                 self.events = [
-                    (int(i * 1000.0 / self.src_fps), i)
-                    for i in range(total_frames)
+                    (
+                        int(frame_index * 1000.0 / self.src_fps),
+                        frame_index
+                    )
+                    for frame_index in range(total_frames)
                 ]
+
                 self.event_index = 0
 
-        # Open a Zed camera if depth camera is used
+        # --------------------------------------------------------------
+        # Open depth camera source
+        # --------------------------------------------------------------
+
         else:
             try:
-                if GlobalSettings["depthCameraProvider"] == "Zed":
+                if provider == "Zed":
                     self.depth = Zed(path, self.isLive)
-                else:
+                elif provider == "Realsens":
                     self.depth = RealSens(path, self.isLive)
+                else:
+                    raise ValueError(
+                        f"Unsupported depth camera provider: {provider}"
+                    )
 
             except Exception as exc:
                 print(f"Failed to open depth camera: {exc}")
@@ -102,21 +188,34 @@ class VideoWorker(basicWorker):
                 self.pathError.emit()
                 return
 
-            # Get the Zed source FPS
             src_fps = self.depth.getFps()
-            self.src_fps = src_fps if src_fps > 0 else 30
+
+            if src_fps is None or src_fps <= 0:
+                src_fps = 30.0
+
+            self.src_fps = float(src_fps)
             self.target_dt = 1.0 / self.src_fps
 
-            print(f"src_fps={self.src_fps} target_dt={self.target_dt*1000:.2f}ms")
+            self.fpsReady.emit(self.src_fps)
 
-            self.prevTime = time.perf_counter()
-            self.smoothedFps = 0.0
+            print(
+                f"src_fps={self.src_fps:.2f}, "
+                f"target_dt={self.target_dt * 1000:.2f} ms"
+            )
+
+        self.prevTime = time.perf_counter()
+        self.smoothedFps = 0.0
+
+        # Start TTL reading only after the video source opened
+        # successfully.
+        if self.isLive and GlobalSettings["enableTTL"]:
+            print("TTLStart")
+            self._startTTLReader()
 
     def loop(self):
         """
-        Run one video loop step.
+        Run one video loop iteration.
         """
-        # Choose live or file playback
         if self.isLive:
             self._loop_live()
         else:
@@ -124,125 +223,142 @@ class VideoWorker(basicWorker):
 
     def afterLoop(self):
         """
-        Release the video source after the worker loop stops.
+        Stop background work and release the video source.
         """
-        self._set_high_res_timer(True)
-        # Close the depth camera if it was used
-        if self.useDepthCamera:
-            if self.depth is not None:
-                self.depth.close()
+        self._stopTTLReader()
+        self._set_high_res_timer(release=True)
 
-        # Release the OpenCV capture if it was used
+        if self._depthMode:
+            if self.depth is not None:
+                try:
+                    self.depth.close()
+                except Exception as exc:
+                    print(f"Failed to close depth camera: {exc}")
+
+                self.depth = None
+
         else:
-            if hasattr(self, "capture") and self.capture is not None:
+            if self.capture is not None:
                 self.capture.release()
+                self.capture = None
+
+    # ==================================================================
+    # Video loops
+    # ==================================================================
 
     def _loop_live(self):
         """
         Read and emit one frame from a live source.
         """
-        # Save loop start time for pacing
         loop_start = time.perf_counter()
 
-        # Read frame from Zed or OpenCV
         if self._depthMode:
             ret, frame = self.depth.read()
         else:
             ret, frame = self.capture.read()
 
-        # Stop the worker if the frame could not be read
         if not ret:
             self.running = False
             return
 
-        # Emit frame and update timing
         self._emit_frame(frame)
         self._pace(loop_start)
         self._update_fps()
 
     def _loop_file(self):
         """
-        Read and emit frames from a video file according to the master time.
+        Read video file frames according to the master clock.
         """
-        # Stop if there are no frames left
         if self.event_index >= len(self.events):
             self.running = False
             return
 
-        # Get current synchronized time
-        nowMs = self.getMasterTimeMs()
+        now_ms = self.getMasterTimeMs()
 
-        # Read every frame that should already be shown
         while self.event_index < len(self.events):
-            frameTimeMs, frameIndex = self.events[self.event_index]
+            frame_time_ms, frame_index = self.events[self.event_index]
 
-            if frameTimeMs > nowMs:
+            if frame_time_ms > now_ms:
                 break
 
-            # Seek to the exact frame by timestamp
-            self.capture.set(cv2.CAP_PROP_POS_MSEC, frameTimeMs)
+            self.capture.set(
+                cv2.CAP_PROP_POS_MSEC,
+                frame_time_ms
+            )
+
             ret, frame = self.capture.read()
 
-            # Stop if the frame could not be read
             if not ret:
                 self.running = False
                 return
 
-            # Emit frame and move to the next event
             self._emit_frame(frame)
             self._update_fps()
+
             self.event_index += 1
 
         QThread.msleep(1)
 
-    # ------------------------------------------------------------------
-    # Shared helpers
-    # ------------------------------------------------------------------
+    # ==================================================================
+    # Shared video helpers
+    # ==================================================================
 
     def _emit_frame(self, frame):
         """
-        Convert, process and emit a frame to the GUI.\n
-        :param frame: Frame to emit.
+        Convert, process, and emit one frame.
+
+        :param frame: OpenCV image.
         """
-        # Guard clause for invalid frames
         if frame is None:
             return
 
-        # ZED returns BGRA, OpenCV returns BGR.
+        if len(frame.shape) != 3:
+            return
+
+        # ZED may return BGRA while OpenCV normally returns BGR.
         if frame.shape[2] == 4:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            frame = cv2.cvtColor(
+                frame,
+                cv2.COLOR_BGRA2BGR
+            )
 
-
-        # Apply hand algorithm if enabled
         if self.useAlgorithm:
             frame = self.algorithm.draw2dHands(
                 frame,
                 self.src_fps,
                 self.useOnlyAlgorithm
             )
-        # Convert normal OpenCV frame to RGB
         else:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(
+                frame,
+                cv2.COLOR_BGR2RGB
+            )
 
-        # Save the current frame for recording
         self.videoFrame = frame
         self.frameNumber += 1
 
-        # Send the frame to the GUI
         self.frameReady.emit(frame)
 
     def _pace(self, loop_start: float):
+        """
+        Limit live playback to the source frame rate.
+        """
         target = loop_start + self.target_dt
         remaining = target - time.perf_counter()
-        # Sleep only for the safely-coarse portion, leave more margin for OS tick rounding
+
+        # Use a normal sleep for the coarse part.
         if remaining > 0.003:
-            QThread.usleep(int((remaining - 0.002) * 1_000_000))
+            QThread.usleep(
+                int((remaining - 0.002) * 1_000_000)
+            )
+
+        # Busy-wait only for the final small interval.
         while time.perf_counter() < target:
             pass
 
     def _update_fps(self):
         """
-        Emit the FPS calculated from the time between the last two frames.
+        Emit the FPS measured between the last two displayed frames.
         """
         now = time.perf_counter()
         frame_time = now - self.prevTime
@@ -252,154 +368,464 @@ class VideoWorker(basicWorker):
             last_frame_fps = 1.0 / frame_time
             self.fpsReady.emit(last_frame_fps)
 
-    # ------------------------------------------------------------------
+    # ==================================================================
     # Recording
-    # ------------------------------------------------------------------
+    # ==================================================================
 
     def initRecording(self):
         """
-        Initialize video recording data and output paths.
+        Initialize recording data and output paths.
         """
-        # Set recording defaults
-        self.recordStarTime = time.perf_counter()
-        self.recordedFrames = []
-        self.lastRecordedFrame = -1
+        self.recordStartTime = time.perf_counter()
 
-        # Only used for ZED / depth camera recording
+        # Compatibility with code that may still use the old typo.
+        self.recordStarTime = self.recordStartTime
+
+        self.recordedFrames = []
+        self.recordedFrameTimes = []
         self.recordedPointClouds = []
 
-        # Create the recording directory
-        path = self.getRecordingPath()
+        self.lastRecordedFrame = -1
+        self.ttl = []
 
-        os.makedirs(path, exist_ok=True)
+        # Discard TTL events received before recording started.
+        self._clearTTLQueue()
 
-        # Create the video output path
+        self.filepath = self.getRecordingPath()
+        os.makedirs(self.filepath, exist_ok=True)
+
         self.newPath = os.path.join(
-            path,
+            self.filepath,
             f"Video_{self.ID}.mp4"
         )
 
-        # Create depth camera output paths
-        if self.useDepthCamera:
+        if self._depthMode:
             self.newHandPointCloudPath = os.path.join(
-                path,
+                self.filepath,
                 f"Video_{self.ID}_PointCloud.npz"
             )
 
             self.newCameraParametersPath = os.path.join(
-                path,
+                self.filepath,
                 f"Video_{self.ID}_CameraParameters.json"
             )
 
     def recordloop(self):
         """
-        Save the current video frame and point cloud if recording.
+        Record the current frame and process pending TTL events.
         """
         if self.videoFrame is None:
             return
 
-        # Do not record the same source frame twice
+        # Prevent the same source frame from being recorded twice.
         if self.frameNumber == self.lastRecordedFrame:
+            # TTL events may still have arrived since the last call.
+            self._processTTLQueue()
             return
 
-        t = time.perf_counter() - self.recordStarTime
-
-        self.recordedFrames.append(
-            (t, self.videoFrame.copy())
+        frame_time = (
+            time.perf_counter() - self.recordStartTime
         )
 
+        self.recordedFrames.append(
+            (
+                frame_time,
+                self.videoFrame.copy()
+            )
+        )
+
+        self.recordedFrameTimes.append(frame_time)
         self.lastRecordedFrame = self.frameNumber
 
-        if self.useDepthCamera and self.depth is not None:
-            if self.depth.point_cloud_img is not None:
+        if self._depthMode and self.depth is not None:
+            point_cloud = getattr(
+                self.depth,
+                "point_cloud_img",
+                None
+            )
+
+            if point_cloud is not None:
                 self.recordedPointClouds.append(
-                    self.depth.point_cloud_img[..., :3]
+                    point_cloud[..., :3]
                     .astype(np.float16)
                     .copy()
                 )
 
+        # Process serial events after adding the current frame. This
+        # allows the TTL event to be matched against all frames
+        # recorded up to this point.
+        self._processTTLQueue()
+
     def stopRecording(self):
         """
-        Save the recorded frames and point cloud data to files.
+        Save video, depth data, and TTL events.
         """
-        # Guard clause if no frames were recorded
+        # Capture any final serial events already waiting in the queue.
+        self._processTTLQueue()
+
         if not self.recordedFrames:
             return
 
         real_fps = self.src_fps
 
-        # Create the video writer
-        height, width = self.recordedFrames[0][1].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        first_frame = self.recordedFrames[0][1]
+        height, width = first_frame.shape[:2]
 
-        output = cv2.VideoWriter(self.newPath, fourcc,
-                                 real_fps, (width, height))
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+        output = cv2.VideoWriter(
+            self.newPath,
+            fourcc,
+            real_fps,
+            (width, height)
+        )
 
         if not output.isOpened():
-            print(f"Failed to open video writer: {self.newPath}")
+            print(
+                f"Failed to open video writer: {self.newPath}"
+            )
             return
 
-        # Write the recorded frames
         for _, frame in self.recordedFrames:
-            output.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            # Frames stored by this worker are RGB.
+            bgr_frame = cv2.cvtColor(
+                frame,
+                cv2.COLOR_RGB2BGR
+            )
+
+            output.write(bgr_frame)
 
         output.release()
 
-        # Save depth camera data if available
-        if self.useDepthCamera and self.recordedPointClouds and self.depth is not None:
+        # --------------------------------------------------------------
+        # Save depth data
+        # --------------------------------------------------------------
 
-            self.depth.saveCameraParameters(self.newCameraParametersPath)
-
-            np.savez(
-                self.newHandPointCloudPath,
-                self.recordedPointClouds
+        if (
+            self._depthMode
+            and self.recordedPointClouds
+            and self.depth is not None
+        ):
+            self.depth.saveCameraParameters(
+                self.newCameraParametersPath
             )
 
-    # ------------------------------------------------------------------
-    # Algorithm slots
-    # ------------------------------------------------------------------
+            np.savez_compressed(
+                self.newHandPointCloudPath,
+                point_clouds=np.asarray(
+                    self.recordedPointClouds
+                )
+            )
+
+        # --------------------------------------------------------------
+        # Save TTL data
+        # --------------------------------------------------------------
+
+        if self.ttl:
+            ttl_path = os.path.join(
+                self.filepath,
+                "ttl.csv"
+            )
+
+            with open(
+                ttl_path,
+                "w",
+                newline="",
+                encoding="utf-8"
+            ) as file:
+                writer = csv.writer(file)
+
+                writer.writerow([
+                    "frame_index",
+                    "ttl_time_seconds",
+                    "frame_time_seconds",
+                    "value"
+                ])
+
+                for event in self.ttl:
+                    writer.writerow([
+                        event["frame_index"],
+                        f"{event['ttl_time']:.9f}",
+                        f"{event['frame_time']:.9f}",
+                        event["value"]
+                    ])
+
+    # ==================================================================
+    # TTL handling
+    # ==================================================================
+
+    def _startTTLReader(self):
+        """
+        Start the non-blocking TTL serial reader thread.
+        """
+        if self.ttlThread is not None:
+            if self.ttlThread.is_alive():
+                return
+
+        self.ttlStopEvent.clear()
+
+        self.ttlThread = threading.Thread(
+            target=self._checkTTL,
+            name=f"TTLReader-{self.ID}",
+            daemon=True
+        )
+
+        self.ttlThread.start()
+
+    def _stopTTLReader(self):
+        """
+        Stop the TTL reader safely.
+
+        The TTL thread exclusively owns and closes the serial port.
+        """
+        self.ttlStopEvent.set()
+
+        ttl_thread = self.ttlThread
+
+        if (
+            ttl_thread is not None
+            and ttl_thread.is_alive()
+            and ttl_thread is not threading.current_thread()
+        ):
+            ttl_thread.join(timeout=1.0)
+
+        if ttl_thread is not None and ttl_thread.is_alive():
+            print("Warning: TTL reader thread did not stop cleanly")
+
+        self.ttlThread = None
+
+    def _checkTTL(self):
+        """
+        Read TTL serial messages in a background thread.
+
+        This thread exclusively owns and closes the serial port.
+        Received events are transferred through ttlQueue.
+        """
+        serial_port = None
+        port = GlobalSettings["port"]
+
+        try:
+            serial_port = serial.Serial(
+                port=port,
+                baudrate=9600,
+                timeout=0.1
+            )
+
+            self.ttlSerial = serial_port
+
+            try:
+                serial_port.reset_input_buffer()
+            except serial.SerialException:
+                pass
+
+            print(f"TTL serial port opened: {port}")
+
+            while not self.ttlStopEvent.is_set():
+                try:
+                    raw_data = serial_port.readline()
+
+                except serial.SerialException as exc:
+                    if not self.ttlStopEvent.is_set():
+                        print(f"TTL serial read error: {exc}")
+                    break
+
+                except OSError as exc:
+                    if not self.ttlStopEvent.is_set():
+                        print(f"TTL serial operating-system error: {exc}")
+                    break
+
+                if not raw_data:
+                    continue
+
+                received_time = time.perf_counter()
+
+                value = raw_data.decode(
+                    "utf-8",
+                    errors="replace"
+                ).strip()
+
+                if not value:
+                    continue
+
+                self.ttlQueue.put({
+                    "received_time": received_time,
+                    "value": value
+                })
+
+        except serial.SerialException as exc:
+            if not self.ttlStopEvent.is_set():
+                print(f"Failed to open TTL serial port {port}: {exc}")
+
+        except Exception as exc:
+            if not self.ttlStopEvent.is_set():
+                print(f"Unexpected TTL reader error: {exc}")
+
+        finally:
+            if self.ttlSerial is serial_port:
+                self.ttlSerial = None
+
+            if serial_port is not None:
+                try:
+                    if serial_port.is_open:
+                        serial_port.close()
+                except (
+                    serial.SerialException,
+                    OSError,
+                    AttributeError
+                ):
+                    pass
+
+            print("TTL serial reader stopped")
+
+    def _processTTLQueue(self):
+        """
+        Transfer pending TTL events into the recording data.
+
+        This method runs in the video worker thread and therefore does
+        not require a lock around recordedFrames or ttl.
+        """
+        while not self.ttlQueue.empty():
+            try:
+                event = self.ttlQueue.get_nowait()
+            except queue.Empty:
+                break
+
+            if not self.isRecording:
+                continue
+
+            if not self.recordedFrameTimes:
+                continue
+
+            ttl_time = (
+                event["received_time"] - self.recordStartTime
+            )
+
+            if ttl_time < 0:
+                continue
+
+            frame_index = self._findNearestFrameIndex(
+                ttl_time
+            )
+
+            frame_time = self.recordedFrameTimes[
+                frame_index
+            ]
+
+            self.ttl.append({
+                "frame_index": frame_index,
+                "ttl_time": ttl_time,
+                "frame_time": frame_time,
+                "value": event["value"]
+            })
+
+    def _findNearestFrameIndex(self, event_time):
+        """
+        Find the recorded frame closest to a TTL event time.
+
+        :param event_time: Time since recording began.
+        :returns: Zero-based recorded frame index.
+        """
+        times = self.recordedFrameTimes
+
+        if not times:
+            return 0
+
+        position = bisect_left(times, event_time)
+
+        if position <= 0:
+            return 0
+
+        if position >= len(times):
+            return len(times) - 1
+
+        previous_index = position - 1
+        next_index = position
+
+        previous_difference = abs(
+            event_time - times[previous_index]
+        )
+
+        next_difference = abs(
+            times[next_index] - event_time
+        )
+
+        if previous_difference <= next_difference:
+            return previous_index
+
+        return next_index
+
+    def _clearTTLQueue(self):
+        """
+        Remove all currently queued TTL events.
+        """
+        while not self.ttlQueue.empty():
+            try:
+                self.ttlQueue.get_nowait()
+            except queue.Empty:
+                break
+
+    def ttlNow(self, value="manual"):
+        """
+        Manually create a TTL event.
+
+        This method may be called from other parts of the application.
+        The event is placed in the same queue as serial TTL events.
+
+        :param value: Value written to the TTL CSV.
+        """
+        self.ttlQueue.put({
+            "received_time": time.perf_counter(),
+            "value": str(value)
+        })
+
+    # ==================================================================
+    # Algorithm settings
+    # ==================================================================
 
     @pyqtSlot(bool)
     def setAlgorithm(self, value: bool):
         """
-        Set whether the Mediapipe algorithm should be used.\n
-        :param `bool` value: New algorithm state.
+        Enable or disable MediaPipe processing.
         """
         self.useAlgorithm = value
 
     @pyqtSlot(bool)
     def setOnlyAlgorithm(self, value: bool):
         """
-        Set whether only the algorithm output should be shown.\n
-        :param `bool` value: New only-algorithm state.
+        Show only the algorithm output.
         """
         self.useOnlyAlgorithm = value
 
     @pyqtSlot(bool)
     def setUseDepthCamera(self, value: bool):
         """
-        Set whether the Zed depth camera should be used.\n
-        :param `bool` value: New depth camera state.
+        Enable or disable the configured depth camera.
         """
         self.useDepthCamera = value
 
-    def _set_high_res_timer(self, release: bool = False):
-        if not release:
-            try:
-                winmm = ctypes.WinDLL('winmm')
-                winmm.timeBeginPeriod(1)
-            except Exception:
-                pass  # not on Windows, or unavailable
-        else:
-            try:
-                winmm = ctypes.WinDLL('winmm')
-                winmm.timeEndPeriod(1)
-            except Exception:
-                pass  # not on Windows, or unavailable
+    # ==================================================================
+    # Windows timer resolution
+    # ==================================================================
 
+    def _set_high_res_timer(self, release: bool = False):
+        """
+        Request or release one-millisecond Windows timer resolution.
+        """
+        try:
+            winmm = ctypes.WinDLL("winmm")
+
+            if release:
+                winmm.timeEndPeriod(1)
+            else:
+                winmm.timeBeginPeriod(1)
+
+        except Exception:
+            # Not running on Windows or winmm is unavailable.
+            pass
 
 
 # ======================================================================
+
 
 class VideoFeed(basicWindowWidget):
     """
@@ -408,124 +834,164 @@ class VideoFeed(basicWindowWidget):
 
     def __init__(self, ID: int, workingDir: str = ""):
         """
-        Create the video feed widget.\n
-        :param `int` ID: ID of the widget.
-        :param `str` workingDir: Working directory of the app, defaults to `""`.
-        """
-        super().__init__(VideoWorker, ID, workingDir=workingDir)
+        Create the video feed widget.
 
-        # Set default variables
+        :param ID: Widget identifier.
+        :param workingDir: Application working directory.
+        """
+        super().__init__(
+            VideoWorker,
+            ID,
+            workingDir=workingDir
+        )
+
         self.useAlgorithm = False
         self.useOnlyAlgorithm = False
         self.cameraNumber = 0
         self.inputType = "video"
 
-        # Create the video display widget
+        # --------------------------------------------------------------
+        # Video display
+        # --------------------------------------------------------------
+
         self.mainWidget = QLabel()
-        self.mainWidget.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.mainWidget.setSizePolicy(QSizePolicy.Policy.Expanding,
-                                      QSizePolicy.Policy.Expanding)
+        self.mainWidget.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
 
-        # Create algorithm and depth camera controls
-        self.Hands = QCheckBox("Use Mediapipe Algorithm")
-        self.OnlyHands = QCheckBox("Use ONLY the Algorithm")
-        self.depthCamera = QCheckBox("Use Depth Camera ")
-        self.depthCamera.setEnabled(False
-                                    )
+        self.mainWidget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
 
-        # Create FPS label
-        self.FPSLabel = QLabel("0")
+        # --------------------------------------------------------------
+        # Controls
+        # --------------------------------------------------------------
 
-        # Create custom control layout
+        self.Hands = QCheckBox(
+            "Use Mediapipe Algorithm"
+        )
+
+        self.OnlyHands = QCheckBox(
+            "Use ONLY the Algorithm"
+        )
+
+        self.depthCamera = QCheckBox(
+            "Use Depth Camera"
+        )
+
+        self.depthCamera.setEnabled(False)
+
+        self.FPSLabel = QLabel("FPS: 0.0")
+
         self.controlLayout = QVBoxLayout()
+
         hbox = QHBoxLayout()
         hbox.setSpacing(5)
+
         hbox.addWidget(self.Hands)
         hbox.addWidget(self.OnlyHands)
         hbox.addWidget(self.depthCamera)
         hbox.addStretch()
+
         self.controlLayout.addLayout(hbox)
         self.controlLayout.addWidget(self.FPSLabel)
 
-        # Create the base widget layout
         self.makeBasicWidget()
 
-    def updateCameraNumber(self, n):
+    def updateCameraNumber(self, number):
         """
-        Update the selected camera number.\n
-        :param n: New camera number.
+        Update the selected camera number.
         """
-        self.cameraNumber = n
+        self.cameraNumber = number
 
     def connectAll(self):
         """
-        Connect the video worker signals and settings.
+        Connect worker signals and apply the current settings.
         """
-        # Send current settings to the worker
-        self.worker.setAlgorithm(self.Hands.isChecked())
-        self.worker.setOnlyAlgorithm(self.OnlyHands.isChecked())
-        self.worker.setUseDepthCamera(self.depthCamera.isChecked())
+        self.worker.setAlgorithm(
+            self.Hands.isChecked()
+        )
 
-        # Connect worker signals
-        self.worker.frameReady.connect(self.setImage)
-        self.worker.fpsReady.connect(self.updateFpsLabel)
+        self.worker.setOnlyAlgorithm(
+            self.OnlyHands.isChecked()
+        )
+
+        self.worker.setUseDepthCamera(
+            self.depthCamera.isChecked()
+        )
+
+        self.worker.frameReady.connect(
+            self.setImage
+        )
+
+        self.worker.fpsReady.connect(
+            self.updateFpsLabel
+        )
 
     @pyqtSlot(object)
     def setImage(self, image):
         """
-        Set the displayed image from an image.\n
-        :param image: Image to display.
+        Display an RGB NumPy image.
         """
-            # Create the Qt image
-        h, w, ch = image.shape
+        if image is None:
+            return
+
+        if len(image.shape) != 3:
+            return
+
+        height, width, channels = image.shape
+
         qimg = QImage(
             image.data,
-            w,
-            h,
-            ch * w,
+            width,
+            height,
+            channels * width,
             QImage.Format.Format_RGB888
         ).copy()
 
-        # Create pixmap from image
         pixmap = QPixmap.fromImage(qimg)
 
-        # Scale the image to the display widget
-        scaled = pixmap.scaled(self.mainWidget.size(),
-                               Qt.AspectRatioMode.KeepAspectRatio,
-                               Qt.TransformationMode.FastTransformation)
+        scaled = pixmap.scaled(
+            self.mainWidget.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation
+        )
 
-        # Show the image
         self.mainWidget.setPixmap(scaled)
         self.mainWidget.update()
 
     @pyqtSlot(float)
     def updateFpsLabel(self, fps):
         """
-        Update the FPS label.\n
-        :param fps: FPS value to display.
+        Update the displayed instantaneous FPS.
         """
-        self.FPSLabel.setText(f"FPS: {fps:.1f}")
+        self.FPSLabel.setText(
+            f"FPS: {fps:.1f}"
+        )
 
     def checkPath(self, path):
         """
-        Check if the selected path is valid.\n
-        :param path: Path to check.
-        :returns: Returns `True` for live mode, otherwise returns the parent path check.
+        Check whether the selected path is valid.
         """
-        return True if self.isLive else super().checkPath(path)
+        if self.isLive:
+            return True
 
-    def setIsLive(self, s):
-        """
-        Set whether the video feed uses live input.\n
-        :param s: New live input state.
-        """
-        # Update the parent live state
-        super().setIsLive(s)
+        return super().checkPath(path)
 
-        # Disable depth camera in file mode
-        if not s and GlobalSettings["depthCameraAvailable"]:
+    def setIsLive(self, state):
+        """
+        Set whether the video feed uses a live source.
+        """
+        super().setIsLive(state)
+
+        if (
+            not state
+            and GlobalSettings["depthCameraAvailable"]
+        ):
             self.depthCamera.setChecked(False)
 
-        # Enable depth camera only in live mode if available
         self.depthCamera.setEnabled(
-            s and GlobalSettings["depthCameraAvailable"])
+            state
+            and GlobalSettings["depthCameraAvailable"]
+        )

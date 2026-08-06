@@ -3,6 +3,7 @@ import os
 import numpy as np
 import mediapipe as mp
 from src.tools.setting import GlobalSettings
+from scipy.signal import butter, filtfilt
 
 
 class mediaWork():
@@ -115,8 +116,6 @@ class mediaWork():
             points = self._findPositionDepth(img, pcl, cameraParameters)
         else:
             points = self._findPosition2D(img)
-
-        points = self.calculateValidPoints(points)
 
         return points
 
@@ -352,12 +351,95 @@ class mediaWork():
             return None
 
         return point
-    
 
-    def calculateValidPoints(self, points) -> object:
-        leftpoints, rightpoints = points
+    def smooth_points(self, points, fps=30.0, cutoff=8.0, order=2):
+        """
+        Apply a Butterworth low-pass filter to exported hand points.
 
-        leftpoints[0][2:]
+        Expected columns:
+            [frame_index, timestamp_ms, landmark_id, x, y, z]
+        """
+        # No points were detected for this hand.
+        if points is None or len(points) == 0:
+            return np.empty((0, 6), dtype=np.float32)
 
-        #gives arrray with x, y, z
-        return points
+        points = np.asarray(points, dtype=np.float64)
+
+        if points.ndim != 2 or points.shape[1] != 6:
+            raise ValueError(
+                f"Expected points with shape (n_rows, 6), "
+                f"but received {points.shape}"
+            )
+
+        if fps <= 0:
+            raise ValueError("fps must be greater than zero")
+
+        nyquist = fps / 2.0
+
+        if not 0 < cutoff < nyquist:
+            raise ValueError(
+                f"cutoff must be between 0 and the Nyquist frequency "
+                f"({nyquist:.2f} Hz)"
+            )
+
+        # Copy the input so frame, timestamp and landmark ID remain unchanged.
+        filtered = points.copy()
+
+        # Create the Butterworth low-pass filter.
+        normalized_cutoff = cutoff / nyquist
+        b, a = butter(order, normalized_cutoff, btype="low")
+
+        # filtfilt requires a minimum number of samples.
+        padlen = 3 * max(len(a), len(b))
+
+        landmark_ids = np.unique(points[:, 2].astype(int))
+
+        for landmark_id in landmark_ids:
+            landmark_mask = points[:, 2].astype(int) == landmark_id
+            landmark_indices = np.flatnonzero(landmark_mask)
+
+            if len(landmark_indices) <= padlen:
+                # Not enough samples for filtfilt.
+                continue
+
+            # Ensure samples are processed in frame order.
+            order_indices = np.argsort(points[landmark_indices, 0])
+            sorted_indices = landmark_indices[order_indices]
+
+            # Filter x, y and z independently.
+            for coordinate_column in (3, 4, 5):
+                values = points[sorted_indices, coordinate_column].copy()
+
+                valid = np.isfinite(values)
+
+                # At least two valid values are needed for interpolation.
+                if np.count_nonzero(valid) < 2:
+                    continue
+
+                # filtfilt cannot process NaN values, so interpolate missing samples.
+                sample_indices = np.arange(len(values))
+
+                interpolated = np.interp(
+                    sample_indices,
+                    sample_indices[valid],
+                    values[valid]
+                )
+
+                try:
+                    smoothed = filtfilt(
+                        b,
+                        a,
+                        interpolated,
+                        axis=0,
+                        padlen=padlen
+                    )
+                except ValueError:
+                    continue
+
+                # Keep originally missing measurements missing.
+                # Remove these two lines if you want interpolated gaps saved.
+                smoothed[~valid] = np.nan
+
+                filtered[sorted_indices, coordinate_column] = smoothed
+
+        return filtered.astype(np.float32)

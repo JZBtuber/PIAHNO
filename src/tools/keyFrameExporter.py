@@ -168,7 +168,9 @@ class KeyFrameWorker(QObject):
 
         #Save each hand track to the selected file format
         for trackId, rows in allRows.items():
-            array = np.array(rows, dtype=np.float32)
+            #array = np.array(rows, dtype=np.float32)
+            array = self.algorithm.smooth_points(rows)
+
             if self.fileFormat.__contains__(".npy"):
                 np.save(f"{newPath}_{trackId}.npy", array)
             elif self.fileFormat.__contains__(".csv"):

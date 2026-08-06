@@ -740,7 +740,7 @@ class basicWindowWidget(QWidget):
         # Connect worker stop signals
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.onWorkerFinished)
-
+        
         self.stopWorker.connect(
             self.worker.stop, Qt.ConnectionType.DirectConnection)
 

@@ -5,6 +5,7 @@ from os import path
 from src.tools.fileIO import saveSettings
 from src.gui.Core import QFileDialog
 from src.tools.Dialogs import ConfirmRemoveDialog
+import serial.tools.list_ports
 
 
 class SettingBox(QDialog):
@@ -84,6 +85,35 @@ class SettingBox(QDialog):
         layout.addLayout(self._addSetting("Path to the save directory",
                                           "Set the set the path to the directory where the different test subject files will be saved",
                                           dirChoice), 0)
+
+        # Choice of the use of TTL
+        TTLCheckbox = QCheckBox()
+        TTLCheckbox.setText("Use TTL signal on usb port")
+        TTLCheckbox.setChecked(settings["enableTTL"])
+        TTLCheckbox.clicked.connect(lambda: settings.__setitem__("enableTTL", TTLCheckbox.isChecked()))
+
+        ports = serial.tools.list_ports.comports()
+        coms = []
+        for port in ports:
+            coms.append(port.usb_description())
+        coms.sort()
+
+        COMComboBox = QComboBox()
+        COMComboBox.addItems(coms)
+        if settings["port"]:
+            COMComboBox.setCurrentText(settings["port"])
+            
+        COMComboBox.currentTextChanged.connect(lambda: settings.__setitem__("port", COMComboBox.currentText()))
+
+        TTLLayout = QHBoxLayout()
+        TTLLayout.addWidget(TTLCheckbox)
+        TTLLayout.addWidget(COMComboBox)
+        containerWidget = QWidget()
+        containerWidget.setLayout(TTLLayout)
+
+        layout.addLayout(self._addSetting("TTL",
+                                          "Enable the use of TTL sync",
+                                          containerWidget), 0)
 
         # Choice of the detection confidence
         detectionConfidence = QDoubleSpinBox()

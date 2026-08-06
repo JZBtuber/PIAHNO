@@ -605,7 +605,7 @@ class WindowChoice(QDialog):
                         id = window.getID()
                         button = QPushButton(f"{id}")
                         button.setMaximumSize(20, 20)
-                        button.clicked.connect(lambda _=False, id=id: self.removeWindow(id))
+                        button.clicked.connect(lambda id=id: self.removeWindow(id))
                         self.hor0.addWidget(button, 0 if id < 5 else 1, ((id - 1) % 4) + 1)
 
                         self.buttons.append(button)

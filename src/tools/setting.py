@@ -14,5 +14,7 @@ GlobalSettings = { #General settings of the app
     "zedResolution" : "HD1080",
     "zedFps" : 30,
     "zedMode" : "Neural_Light",
-    "zedConfidenceThreshold" : 40
+    "zedConfidenceThreshold" : 40,
+    "enableTTL" : False,
+    "port" : ""
     }
